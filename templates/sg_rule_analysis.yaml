@@ -234,14 +234,21 @@ Resources:
                               }
                             },
                             "Next": "ParseVPCFLowLogsSaveUsageCount",
-                            "InputPath": "$"
+                            "InputPath": "$",
+                            "ResultPath": null
                           },
                           "ParseVPCFLowLogsSaveUsageCount": {
                             "Type": "Task",
                             "Resource": "arn:aws:states:::glue:startJobRun.sync",
                             "Parameters": {
-                              "JobName": "${SgaParseFlowLogsGlueJob}"
+                              "JobName": "${SgaParseFlowLogsGlueJob}",
+                              "Arguments": {
+                                "--region.$": "$.region",
+                                "--table.$": "$.table",
+                                "--path.$": "$.path"
+                              }
                             },
+                            "InputPath": "$",
                             "End": true
                           }
                         }
@@ -460,7 +467,7 @@ Resources:
                                     - - 's3://'
                                       - !ImportValue sga-resources-bucket-ref
                                       - '/scripts/'
-                                      - 'flow_logs_parser.py'
+                                      - 'flow_logs_parser_0.0.1.py'
                 PythonVersion: "3.9"
             DefaultArguments: 
                 --class: "GlueApp"
@@ -472,6 +479,14 @@ Resources:
                                       - '/libraries/'
                                       - 'awswrangler-2.14.0-py3-none-any.whl'
                 --job-language: "python"
+                --region: "eu-west-2"
+                --FlowLogsAthenaResultsBucket: "security-group-monitoring-test-bucket-athena"
+                --SGRulesTable: "security-groups"
+                --SGRulesGroupIndex: "group_id-index"
+                --NICInterfaceTable: "sg-analysis-interface-details"
+                --DynamoTableName: "sg-analysis-rules-usage"
+                --SGARulesUseIndex: "addr-id-index"
+                --path: "vpcflowlogs"
             MaxRetries: 1
             Timeout: 2880
             GlueVersion: "1.0"
