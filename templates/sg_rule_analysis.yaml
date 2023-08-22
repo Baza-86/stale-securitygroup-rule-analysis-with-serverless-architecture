@@ -105,6 +105,7 @@ Resources:
     DynamoTableSGRules:
         Type: "AWS::DynamoDB::Table"
         Properties:
+          BillingMode: PAY_PER_REQUEST
           GlobalSecondaryIndexes:
             - IndexName: groups
               KeySchema:
@@ -112,9 +113,6 @@ Resources:
                 KeyType: HASH 
               Projection:
                 ProjectionType: ALL
-              ProvisionedThroughput:
-                ReadCapacityUnits: 10
-                WriteCapacityUnits: 10
           AttributeDefinitions:
             - AttributeName: id
               AttributeType: S
@@ -123,13 +121,11 @@ Resources:
           KeySchema:
             - AttributeName: id
               KeyType: HASH
-          ProvisionedThroughput:
-            ReadCapacityUnits: 10
-            WriteCapacityUnits: 10
 
     DynamoTableSGAnalysis:
         Type: "AWS::DynamoDB::Table"
         Properties:
+          BillingMode: PAY_PER_REQUEST
           GlobalSecondaryIndexes:
             - IndexName: protocol
               KeySchema:
@@ -139,9 +135,6 @@ Resources:
                 KeyType: RANGE
               Projection:
                 ProjectionType: ALL
-              ProvisionedThroughput:
-                ReadCapacityUnits: 5
-                WriteCapacityUnits: 8
           AttributeDefinitions:
             - AttributeName: sgr_flow_hash
               AttributeType: S
@@ -152,9 +145,6 @@ Resources:
           KeySchema:
             - AttributeName: sgr_flow_hash
               KeyType: HASH
-          ProvisionedThroughput:
-            ReadCapacityUnits: 5
-            WriteCapacityUnits: 8
       
     DynamoTableENIAnalysis:
         Type: "AWS::DynamoDB::Table"
