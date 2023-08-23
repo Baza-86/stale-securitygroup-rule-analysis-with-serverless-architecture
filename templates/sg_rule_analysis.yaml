@@ -457,7 +457,7 @@ Resources:
                                     - - 's3://'
                                       - !ImportValue sga-resources-bucket-ref
                                       - '/scripts/'
-                                      - 'flow_logs_parser_0.0.1.py'
+                                      - 'flow_logs_parser.py'
                 PythonVersion: "3.9"
             DefaultArguments: 
                 --class: "GlueApp"
@@ -469,17 +469,17 @@ Resources:
                                       - '/libraries/'
                                       - 'awswrangler-2.14.0-py3-none-any.whl'
                 --job-language: "python"
-                --region: "eu-west-2"
-                --FlowLogsAthenaResultsBucket: "security-group-monitoring-test-bucket-athena"
-                --SGRulesTable: "security-groups"
-                --SGRulesGroupIndex: "group_id-index"
-                --NICInterfaceTable: "sg-analysis-interface-details"
-                --DynamoTableName: "sg-analysis-rules-usage"
+                --region: !Ref "AWS::Region"
+                --FlowLogsAthenaResultsBucket: !ImportValue sga-athena-bucket-ref
+                --SGRulesTable: !Ref DynamoTableSGRules
+                --SGRulesGroupIndex: "groups"
+                --NICInterfaceTable: !Ref DynamoTableENIAnalysis
+                --DynamoTableName: !Ref DynamoTableSGAnalysis
                 --SGARulesUseIndex: "addr-id-index"
                 --path: "vpcflowlogs"
             MaxRetries: 1
             Timeout: 2880
-            GlueVersion: "1.0"
+            GlueVersion: "3.0"
             MaxCapacity: 1
 
     SgaGetSgLambdaIAMRole:
