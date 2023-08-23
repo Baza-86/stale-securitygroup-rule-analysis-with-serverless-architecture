@@ -363,10 +363,10 @@ Resources:
                 --enable-job-insights: "false"
                 --job-language: "python"
                 --prebuilt-library-option: "prebuilt-library-enable"
-                --region: "eu-west-2"
-                --database: "sg_analysis_rules_data_ks"
+                --region: !Ref "AWS::Region"
+                --database: !ImportValue sga-glue-database-ref
                 --table: "sg_analysis_rules_data_ks"
-                --bucket: "sga-buckets-sgas3bucketathena-1oadk3sp8xq5n"
+                --bucket: !ImportValue sga-athena-bucket-ref
                 --path: "path"
             MaxRetries: 1
             Timeout: 2880
