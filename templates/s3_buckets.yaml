@@ -1,14 +1,66 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: "Security Group Analysis S3 Buckets"
+Parameters:
+  SgaUserRoleArn:
+    Type: String
+    Description: the ARN of the role that users assume for the SGA solution
 Resources:
 
     SgaS3BucketAthena:
       Type: "AWS::S3::Bucket"
       # DeletionPolicy: Retain
+    
+    SgaS3BucketAthenaBucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        Bucket: !Ref SgaS3BucketAthena
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Sid: DeleteObject
+              Effect: Allow
+              Principal:
+                AWS: 
+                  - !Ref SgaUserRoleArn
+              Action: 
+                - "s3:DeleteObject"
+              Resource: 
+                - !GetAtt SgaS3BucketAthena.Arn
+                - !Join 
+                  - ''
+                  - - !GetAtt SgaS3BucketAthena.Arn
+                    - '/*'
+              Condition:
+                Bool:
+                  'aws:SecureTransport': 'true'
 
     SgaS3BucketResources:
       Type: "AWS::S3::Bucket"
       # DeletionPolicy: Retain
+    
+    SgaS3BucketResourcesBucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        Bucket: !Ref SgaS3BucketResources
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Sid: DeleteObject
+              Effect: Allow
+              Principal:
+                AWS: 
+                  - !Ref SgaUserRoleArn
+              Action: 
+                - "s3:DeleteObject"
+              Resource: 
+                - !GetAtt SgaS3BucketResources.Arn
+                - !Join 
+                  - ''
+                  - - !GetAtt SgaS3BucketResources.Arn
+                    - '/*'
+              Condition:
+                Bool:
+                  'aws:SecureTransport': 'true'
 
 Outputs:
   ResourcesBucketArn:
