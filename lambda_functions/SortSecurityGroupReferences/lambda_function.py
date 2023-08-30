@@ -38,8 +38,8 @@ def lambda_handler(event, context):
         nic.get_interfaces_by_sg_id(sg_id=[sgr.properties['ReferencedGroupInfo']['GroupId']])
         for ni in nic.iface_ids:
             sg_dict['ip_addresses'].append(nic.get_interface(nic_id=[ni]).private_ip_address)
-        sg_ip_scope = sg_ip_scope(**sg_dict)
-        security_group_rules_with_reference_mapped.append(sg_ip_scope)
+        sg_ip = sg_ip_scope(**sg_dict)
+        security_groups_with_sgrs_mapped.append(sg_ip)
 
     print(security_groups_with_sgrs_mapped)
 
