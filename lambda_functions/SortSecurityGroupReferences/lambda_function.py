@@ -14,6 +14,7 @@ def lambda_handler(event, context):
         ArnRole = f"arn:aws:iam::{accountNo}:role/{CrossAccountRoleName}"
         print("Using role: " + ArnRole)
         sg_client = SecurityGroup(role_arn=ArnRole, role_session_name="AssumedRoleSessionName")
+        nic = NetworkInterface(role_arn=ArnRole, role_session_name="AssumedRoleSessionName")
     else:
         sg_client = SecurityGroup(aws_profile="LambdaEc2Access-XXXXXXXXXX")
         nic = NetworkInterface(aws_profile="LambdaEc2Access-XXXXXXXXXX")
