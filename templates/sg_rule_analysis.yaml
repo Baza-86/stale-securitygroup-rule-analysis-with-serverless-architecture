@@ -29,7 +29,8 @@ Resources:
             Statement:
               - Effect: Allow
                 Principal:
-                  Service: states.amazonaws.com
+                  Service:
+                  - states.amazonaws.com
                 Action: sts:AssumeRole
           Path: /
           ManagedPolicyArns:
@@ -62,7 +63,8 @@ Resources:
                       - logs:DescribeLogGroups
                     Resource: "*"
 
-    IAMManagedPolicy:
+
+    SgaEventBridgeIAMManagedPolicy:
         Type: "AWS::IAM::ManagedPolicy"
         Properties:
             Path: "/service-role/"
@@ -82,12 +84,28 @@ Resources:
                     ]
                 }
 
+    SgaEventBridgeIAMRole:
+        Type: AWS::IAM::Role
+        Properties:
+          AssumeRolePolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Principal:
+                  Service:
+                  - events.amazonaws.com
+                Action: sts:AssumeRole
+          Path: /
+          ManagedPolicyArns:
+            - !Ref SgaEventBridgeIAMManagedPolicy
+
     StepFuncLogGroup:
         Type: "AWS::Logs::LogGroup"
 
     DynamoTableSGRules:
         Type: "AWS::DynamoDB::Table"
         Properties:
+          BillingMode: PAY_PER_REQUEST
           GlobalSecondaryIndexes:
             - IndexName: groups
               KeySchema:
@@ -95,9 +113,6 @@ Resources:
                 KeyType: HASH 
               Projection:
                 ProjectionType: ALL
-              ProvisionedThroughput:
-                ReadCapacityUnits: 5
-                WriteCapacityUnits: 5
           AttributeDefinitions:
             - AttributeName: id
               AttributeType: S
@@ -106,13 +121,11 @@ Resources:
           KeySchema:
             - AttributeName: id
               KeyType: HASH
-          ProvisionedThroughput:
-            ReadCapacityUnits: 5
-            WriteCapacityUnits: 5
 
     DynamoTableSGAnalysis:
         Type: "AWS::DynamoDB::Table"
         Properties:
+          BillingMode: PAY_PER_REQUEST
           GlobalSecondaryIndexes:
             - IndexName: protocol
               KeySchema:
@@ -122,9 +135,6 @@ Resources:
                 KeyType: RANGE
               Projection:
                 ProjectionType: ALL
-              ProvisionedThroughput:
-                ReadCapacityUnits: 5
-                WriteCapacityUnits: 5
           AttributeDefinitions:
             - AttributeName: sgr_flow_hash
               AttributeType: S
@@ -135,9 +145,6 @@ Resources:
           KeySchema:
             - AttributeName: sgr_flow_hash
               KeyType: HASH
-          ProvisionedThroughput:
-            ReadCapacityUnits: 5
-            WriteCapacityUnits: 5
       
     DynamoTableENIAnalysis:
         Type: "AWS::DynamoDB::Table"
@@ -155,71 +162,86 @@ Resources:
     StepFunctionsStateMachine:
         Type: "AWS::StepFunctions::StateMachine"
         Properties:
-            StateMachineName: !Ref EventsRule
             DefinitionString: !Sub |
                 {
-                  "Comment": "A description of my state machine",
-                  "StartAt": "Lambda GetSG",
+                  "StartAt": "ProcessItems",
                   "States": {
-                    "Lambda GetSG": {
-                      "Type": "Task",
-                      "Resource": "arn:aws:states:::lambda:invoke",
-                      "OutputPath": "$.Payload",
-                      "Parameters": {
-                        "Payload.$": "$",
-                        "FunctionName": "${SgaGetSgLambda.Arn}"
-                      },
-                      "Retry": [
-                        {
-                          "ErrorEquals": [
-                            "Lambda.ServiceException",
-                            "Lambda.AWSLambdaException",
-                            "Lambda.SdkClientException",
-                            "Lambda.TooManyRequestsException"
-                          ],
-                          "IntervalSeconds": 2,
-                          "MaxAttempts": 6,
-                          "BackoffRate": 2
+                    "ProcessItems": {
+                      "Type": "Map",
+                      "ItemsPath": "$.data",
+                      "Iterator": {
+                        "StartAt": "GetSG",
+                        "States": {
+                          "GetSG": {
+                            "Type": "Task",
+                            "Resource": "${SgaGetSgLambda.Arn}",
+                            "InputPath": "$",
+                            "Retry": [
+                              {
+                                "ErrorEquals": [
+                                  "Lambda.ServiceException",
+                                  "Lambda.AWSLambdaException",
+                                  "Lambda.SdkClientException",
+                                  "Lambda.TooManyRequestsException"
+                                ],
+                                "IntervalSeconds": 2,
+                                "MaxAttempts": 6,
+                                "BackoffRate": 2
+                              }
+                            ],
+                            "Next": "GetENI",
+                            "ResultPath": null
+                          },
+                          "GetENI": {
+                            "Type": "Task",
+                            "Resource": "${SgaGetEniLambda.Arn}",
+                            "InputPath": "$",
+                            "Retry": [
+                              {
+                                "ErrorEquals": [
+                                  "Lambda.ServiceException",
+                                  "Lambda.AWSLambdaException",
+                                  "Lambda.SdkClientException",
+                                  "Lambda.TooManyRequestsException"
+                                ],
+                                "IntervalSeconds": 2,
+                                "MaxAttempts": 6,
+                                "BackoffRate": 2
+                              }
+                            ],
+                            "Next": "QueryVPCFlowLogsSaveToS3",
+                            "ResultPath": null
+                          },
+                          "QueryVPCFlowLogsSaveToS3": {
+                            "Type": "Task",
+                            "Resource": "arn:aws:states:::glue:startJobRun.sync",
+                            "Parameters": {
+                              "JobName": "${SgaStartAthenaQueryGlueJob}",
+                              "Arguments": {
+                                "--region.$": "$.region",
+                                "--table.$": "$.table",
+                                "--path.$": "$.path"
+                              }
+                            },
+                            "Next": "ParseVPCFLowLogsSaveUsageCount",
+                            "InputPath": "$",
+                            "ResultPath": null
+                          },
+                          "ParseVPCFLowLogsSaveUsageCount": {
+                            "Type": "Task",
+                            "Resource": "arn:aws:states:::glue:startJobRun.sync",
+                            "Parameters": {
+                              "JobName": "${SgaParseFlowLogsGlueJob}",
+                              "Arguments": {
+                                "--region.$": "$.region",
+                                "--table.$": "$.table",
+                                "--path.$": "$.path"
+                              }
+                            },
+                            "InputPath": "$",
+                            "End": true
+                          }
                         }
-                      ],
-                      "Next": "Lambda GetEni"
-                    },
-                    "Lambda GetEni": {
-                      "Type": "Task",
-                      "Resource": "arn:aws:states:::lambda:invoke",
-                      "OutputPath": "$.Payload",
-                      "Parameters": {
-                        "Payload.$": "$",
-                        "FunctionName": "${SgaGetEniLambda.Arn}"
-                      },
-                      "Retry": [
-                        {
-                          "ErrorEquals": [
-                            "Lambda.ServiceException",
-                            "Lambda.AWSLambdaException",
-                            "Lambda.SdkClientException",
-                            "Lambda.TooManyRequestsException"
-                          ],
-                          "IntervalSeconds": 2,
-                          "MaxAttempts": 6,
-                          "BackoffRate": 2
-                        }
-                      ],
-                      "Next": "Glue QueryVPCFlowLogsSaveToS3"
-                    },
-                    "Glue QueryVPCFlowLogsSaveToS3": {
-                      "Type": "Task",
-                      "Resource": "arn:aws:states:::glue:startJobRun.sync",
-                      "Parameters": {
-                        "JobName": "${SgaStartAthenaQueryGlueJob}"
-                      },
-                      "Next": "Glue ParseVPCFLowLogsSaveUsageCount"
-                    },
-                    "Glue ParseVPCFLowLogsSaveUsageCount": {
-                      "Type": "Task",
-                      "Resource": "arn:aws:states:::glue:startJobRun.sync",
-                      "Parameters": {
-                        "JobName": "${SgaParseFlowLogsGlueJob}"
                       },
                       "End": true
                     }
@@ -237,13 +259,29 @@ Resources:
     EventsRule:
         Type: "AWS::Events::Rule"
         Properties:
-            ScheduleExpression: "cron(0 9 * * ? *)"
+            ScheduleExpression: "cron(30 * * * ? *)"
             State: "DISABLED"
             Targets: 
-              - 
-                Arn: !Sub "arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:sg-analysis-step-function"
-                Id: "Id70bcbcb6-9bda-4f24-8f45-8f3dbb65692c"
-                RoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/service-role/SG_Analysis_Amazon_EventBridge_Invoke_Step_Functions"
+                - 
+                  Arn:
+                    Fn::GetAtt:
+                      - StepFunctionsStateMachine
+                      - Arn
+                  Id: 'SgaStepFunction'
+                  RoleArn: !GetAtt 
+                    - SgaEventBridgeIAMRole
+                    - Arn
+                  Input: |-
+                    {
+                      "data": [
+                        {
+                          "AccountNo": "012345678901",
+                          "region": "eu-west-2",
+                          "table": "SomeGlueTable",
+                          "path": "path/path"
+                        }
+                      ]
+                    }
             EventBusName: "default"
 
     SgaStartAthenaQueryGlueJobIAMRole:
@@ -325,10 +363,10 @@ Resources:
                 --enable-job-insights: "false"
                 --job-language: "python"
                 --prebuilt-library-option: "prebuilt-library-enable"
-                --region: "eu-west-2"
-                --database: "sg_analysis_rules_data_ks"
+                --region: !Ref "AWS::Region"
+                --database: !ImportValue sga-glue-database-ref
                 --table: "sg_analysis_rules_data_ks"
-                --bucket: "sga-buckets-sgas3bucketathena-1oadk3sp8xq5n"
+                --bucket: !ImportValue sga-athena-bucket-ref
                 --path: "path"
             MaxRetries: 1
             Timeout: 2880
@@ -397,7 +435,13 @@ Resources:
                         - dynamodb:PutItem
                         - dynamodb:GetItem
                         - dynamodb:UpdateItem
-                      Resource: !GetAtt DynamoTableSGAnalysis.Arn
+                        - dynamodb:Query
+                      Resource: 
+                        - !GetAtt DynamoTableSGAnalysis.Arn
+                        - !Join
+                            - ''
+                            - - !GetAtt DynamoTableSGAnalysis.Arn
+                              - "/*"
     
     SgaParseFlowLogsGlueJob:
         Type: "AWS::Glue::Job"
@@ -425,9 +469,17 @@ Resources:
                                       - '/libraries/'
                                       - 'awswrangler-2.14.0-py3-none-any.whl'
                 --job-language: "python"
+                --region: !Ref "AWS::Region"
+                --FlowLogsAthenaResultsBucket: !ImportValue sga-athena-bucket-ref
+                --SGRulesTable: !Ref DynamoTableSGRules
+                --SGRulesGroupIndex: "groups"
+                --NICInterfaceTable: !Ref DynamoTableENIAnalysis
+                --DynamoTableName: !Ref DynamoTableSGAnalysis
+                --SGARulesUseIndex: "addr-id-index"
+                --path: "vpcflowlogs"
             MaxRetries: 1
             Timeout: 2880
-            GlueVersion: "1.0"
+            GlueVersion: "3.0"
             MaxCapacity: 1
 
     SgaGetSgLambdaIAMRole:
@@ -486,7 +538,7 @@ Resources:
         Timeout: 300
         Code:
           S3Bucket: !ImportValue sga-resources-bucket-ref
-          S3Key: KS-Test-SgaGetSgLambda-FU23JMQzQK3h-e5bf42f5-d48d-49eb-b014-c60d1690fe98.zip
+          S3Key: KS-Test-SgaGetSgLambda-FU23JMQzQK3h-b0d41471-bd70-4a45-9548-4fa7e8e2c158.zip
 
     SgaGetEniLambdaIAMRole:
         Type: AWS::IAM::Role
@@ -545,4 +597,4 @@ Resources:
         Timeout: 300
         Code:
           S3Bucket: !ImportValue sga-resources-bucket-ref
-          S3Key: KS-Test-SgaGetEniLambda-zTqrdlSrwIes-49aa08b1-367c-41d5-9f21-8ec2f1cc355b.zip
+          S3Key: KS-Test-SgaGetEniLambda-zTqrdlSrwIes-dd6156a0-4ad4-441c-b0ea-4ad738306e4d.zip
