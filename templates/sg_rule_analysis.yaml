@@ -221,6 +221,26 @@ Resources:
                                 "BackoffRate": 2
                               }
                             ],
+                            "Next": "SortSGs",
+                            "ResultPath": null
+                          },
+                          "SortSGs": {
+                            "Type": "Task",
+                            "Resource": "${SgaSortSGLambda.Arn}",
+                            "InputPath": "$",
+                            "Retry": [
+                              {
+                                "ErrorEquals": [
+                                  "Lambda.ServiceException",
+                                  "Lambda.AWSLambdaException",
+                                  "Lambda.SdkClientException",
+                                  "Lambda.TooManyRequestsException"
+                                ],
+                                "IntervalSeconds": 2,
+                                "MaxAttempts": 6,
+                                "BackoffRate": 2
+                              }
+                            ],
                             "Next": "QueryVPCFlowLogsSaveToS3",
                             "ResultPath": null
                           },
