@@ -159,6 +159,20 @@ Resources:
             ReadCapacityUnits: 5
             WriteCapacityUnits: 5
 
+
+    DynamoTableSortSG:
+        Type: "AWS::DynamoDB::Table"
+        Properties:
+          AttributeDefinitions:
+            - AttributeName: id
+              AttributeType: S
+          KeySchema:
+            - AttributeName: id
+              KeyType: HASH
+          ProvisionedThroughput:
+            ReadCapacityUnits: 5
+            WriteCapacityUnits: 5
+
     StepFunctionsStateMachine:
         Type: "AWS::StepFunctions::StateMachine"
         Properties:
@@ -598,3 +612,62 @@ Resources:
         Code:
           S3Bucket: !ImportValue sga-resources-bucket-ref
           S3Key: KS-Test-SgaGetEniLambda-zTqrdlSrwIes-dd6156a0-4ad4-441c-b0ea-4ad738306e4d.zip
+
+    SgaSortSGLambdaIAMRole:
+        Type: AWS::IAM::Role
+        Properties:
+          AssumeRolePolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Principal:
+                  Service: lambda.amazonaws.com
+                Action: sts:AssumeRole
+          Path: /
+          ManagedPolicyArns:
+            - !Ref SgaCloudWatchLogsPolicy
+          Policies:
+            - PolicyName: DescribeSecurityGroupsPolicy
+              PolicyDocument:
+                Version: '2012-10-17'
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - ec2:DescribeNetworkInterfaces
+                      - ec2:DescribeTags
+                      - ec2:DescribeNetworkAcls
+                      - ec2:DescribeRouteTables
+                    Resource: "*"
+            - PolicyName: DynamoDBPermissions
+              PolicyDocument:
+                Version: '2012-10-17'
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - dynamodb:PutItem
+                      - dynamodb:Query
+                    Resource: !GetAtt DynamoTableSortSG.Arn
+            - PolicyName: AssumeCrossAccountRole
+              PolicyDocument:
+                Version: '2012-10-17'
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - sts:AssumeRole
+                    Resource: arn:aws:iam::*:role/SgaCrossAccountSgrIAMRole
+
+    SgaSortSGLambda:
+      Type: "AWS::Lambda::Function"
+      Properties:
+        Role: !GetAtt SgaSortSGLambdaIAMRole.Arn
+        Handler: lambda_function.lambda_handler
+        Environment:
+          Variables:
+            DB_TABLE: !Ref DynamoTableSortSG
+            # Define CROSS_ACCOUNT_ROLE_NAME here if you want to assume another role e.g. `ARN_ROLE: arn:aws:iam::<AccountNo>:role/<Role>`
+            CROSS_ACCOUNT_ROLE_NAME: SgaSortSGLambdaIAMRole
+        Runtime: python3.10
+        Timeout: 300
+        Code:
+          S3Bucket: !ImportValue sga-resources-bucket-ref
+          S3Key: SortSecurityGroupReferences-33408ae9-78dc-426b-b200-36363544cffc.zip

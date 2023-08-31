@@ -11,7 +11,7 @@ def lambda_handler(event, context):
 
     sg_ip_scope = namedtuple('sg_ip_scope',['id','ip_addresses'])
     
-    accountNo = None
+    accountNo = event.get('AccountNo')
     CrossAccountRoleName = os.environ.get('CROSS_ACCOUNT_ROLE_NAME')
     if accountNo:
         ArnRole = f"arn:aws:iam::{accountNo}:role/{CrossAccountRoleName}"
@@ -19,8 +19,8 @@ def lambda_handler(event, context):
         sg_client = SecurityGroup(role_arn=ArnRole, role_session_name="AssumedRoleSessionName")
         nic = NetworkInterface(role_arn=ArnRole, role_session_name="AssumedRoleSessionName")
     else:
-        sg_client = SecurityGroup(aws_profile="LambdaEc2Access-XXXXXXXXXX")
-        nic = NetworkInterface(aws_profile="LambdaEc2Access-XXXXXXXXXX")
+        sg_client = SecurityGroup()
+        nic = NetworkInterface()
         
     sg_client.list_security_groups()
     
@@ -40,10 +40,20 @@ def lambda_handler(event, context):
             sg_dict['ip_addresses'].append(nic.get_interface(nic_id=[ni]).private_ip_address)
         sg_ip = sg_ip_scope(**sg_dict)
         security_groups_with_sgrs_mapped.append(sg_ip)
-
-    print(security_groups_with_sgrs_mapped)
-
-if __name__ == "__main__":
-    event = []
-    context = []
-    lambda_handler(event, context)
+    
+    try:
+        response = export_client.write_ddb(ddb_table=os.environ['DB_TABLE'],input_list=security_groups_with_sgrs_mapped)
+        return response
+    except Exception as e:
+        print(e)
+        error_msg = {
+            "message": e.response
+        }
+        print(error_msg.error)
+        return {
+            "message": e.response
+        }
+    
+    
+    
+    
