@@ -47,6 +47,7 @@ Resources:
                     Resource:
                       - !GetAtt SgaGetSgLambda.Arn
                       - !GetAtt SgaGetEniLambda.Arn
+                      - !GetAtt SgaSortSGLambda.Arn
             - PolicyName: SgaSfCwlStepFunctions
               PolicyDocument:
                 Version: '2012-10-17'
@@ -683,7 +684,7 @@ Resources:
           Variables:
             DB_TABLE: !Ref DynamoTableSortSG
             # Define CROSS_ACCOUNT_ROLE_NAME here if you want to assume another role e.g. `ARN_ROLE: arn:aws:iam::<AccountNo>:role/<Role>`
-            CROSS_ACCOUNT_ROLE_NAME: SgaSortSGLambdaIAMRole
+            CROSS_ACCOUNT_ROLE_NAME: SgaCrossAccountSgrIAMRole
         Runtime: python3.10
         Timeout: 300
         Code:
