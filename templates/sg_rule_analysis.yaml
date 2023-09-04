@@ -686,7 +686,7 @@ Resources:
             # Define CROSS_ACCOUNT_ROLE_NAME here if you want to assume another role e.g. `ARN_ROLE: arn:aws:iam::<AccountNo>:role/<Role>`
             CROSS_ACCOUNT_ROLE_NAME: SgaCrossAccountSgrIAMRole
         Runtime: python3.10
-        Timeout: 300
+        Timeout: 600
         Code:
           S3Bucket: !ImportValue sga-resources-bucket-ref
           S3Key: SortSecurityGroupReferences-33408ae9-78dc-426b-b200-36363544cffc.zip
