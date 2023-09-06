@@ -11,6 +11,8 @@ from awsglue.utils import getResolvedOptions
 from boto3.dynamodb.types import TypeDeserializer, TypeSerializer
 from ipaddress import IPv4Address, IPv4Network
 from hashlib import sha1
+from functools import lru_cache
+from copy import deepcopy
 
 args = getResolvedOptions(sys.argv, ['region', 'FlowLogsAthenaResultsBucket', 'SGRulesTable', 'SGRulesGroupIndex', 'NICInterfaceTable', 'DynamoTableName', 'SGARulesUseIndex', 'path'])
 
