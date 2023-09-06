@@ -70,6 +70,19 @@ def rule_filter(resp_list):
     ref_rules = [r for r in resp_list if r['properties'].get('ReferencedGroupInfo')]
     cidr_rules = [r for r in resp_list if r['properties'].get('CidrIpv4')]
     return (ref_rules,cidr_rules)
+
+@lru_cache(maxsize=32)
+def get_sg_ref_ips(sg_id):
+    deserialize = TypeDeserializer()
+    response = dynamodb.get_item(
+        TableName=sg_sort_table,
+        Key={'id':{'S':sg_id}}
+    )
+    if 'Item' in response:
+        ref_ips = {k: deserialize.deserialize(v) for k, v in response['Item'].items()}['ip_addresses']
+        return ref_ips
+    else:
+        print (f'sg id: {sg_id} not found!')
 def rule_matcher(resp_list,flow):
     [r.setdefault('match_score',1) for r in resp_list]
     if len(resp_list) == 1:
