@@ -66,6 +66,10 @@ def network_scorer(rule_block):
     network_score = IPv4Network(rule_block).prefixlen
     return network_score
 
+def rule_filter(resp_list):
+    ref_rules = [r for r in resp_list if r['properties'].get('ReferencedGroupInfo')]
+    cidr_rules = [r for r in resp_list if r['properties'].get('CidrIpv4')]
+    return (ref_rules,cidr_rules)
 def rule_matcher(resp_list,flow):
     [r.setdefault('match_score',1) for r in resp_list]
     if len(resp_list) == 1:
