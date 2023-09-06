@@ -11,7 +11,10 @@ def deleteDBB():
         if items['LastEvaluatedKey']:
             lastevalutedkey = items['LastEvaluatedKey']
             for item in items['Items']:
-                delete_ddb_item(item)
+                delete_ddb_item(client=client, item=item, ddb_table=ddb_table)
+
+        print(items['Count'])
+        print(items['LastEvaluatedKey'])
                 
     else:
         print("Please set the DB_TABLE Enviroment Varible!")
