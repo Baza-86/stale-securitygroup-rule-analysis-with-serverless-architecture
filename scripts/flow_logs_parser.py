@@ -98,7 +98,7 @@ def port_test(rule_port_from,rule_port_to,flow_port):
         return False
 
 def rule_matcher(resp_list,flow):
-    [r.setdefault('match_score',1) for r in resp_list]
+    [r.update({'match_score':1}) for r in resp_list]
     if len(resp_list) == 1:
         return resp_list
     else:
