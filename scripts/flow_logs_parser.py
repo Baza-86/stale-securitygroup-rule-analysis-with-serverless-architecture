@@ -83,6 +83,11 @@ def get_sg_ref_ips(sg_id):
         return ref_ips
     else:
         print (f'sg id: {sg_id} not found!')
+
+def ref_rule_dict_builder(ref_rule,ip_address):
+    rr = deepcopy(ref_rule)
+    rr['properties']['CidrIpv4'] = f'{ip_address}/32'
+    return rr
 def rule_matcher(resp_list,flow):
     [r.setdefault('match_score',1) for r in resp_list]
     if len(resp_list) == 1:
