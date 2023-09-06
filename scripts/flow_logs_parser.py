@@ -102,7 +102,14 @@ def rule_matcher(resp_list,flow):
     if len(resp_list) == 1:
         return resp_list
     else:
-        filtered_list = [r for r in resp_list if network_test(r['properties'].get('CidrIpv4'),flow['addr']) and protocol_test(r['properties']['IpProtocol'],flow['protocol'])]
+        ref_rules,cidr_rules = rule_filter(resp_list)
+    if len(ref_rules) > 0:
+        for ref in ref_rules:
+            ip_addresses = get_sg_ref_ips(ref['properties'].get('ReferencedGroupInfo')['GroupId'])
+            for ip in ip_addresses:
+                cidr_rules.append(ref_rule_dict_builder(ref,ip))
+    if len(cidr_rules) > 0:
+        filtered_list = [r for r in cidr_rules if network_test(r['properties'].get('CidrIpv4'),flow['addr']) and protocol_test(r['properties']['IpProtocol'],flow['protocol']) and port_test(r['properties'].get('FromPort'),r['properties'].get('ToPort'),flow['port'])]
         [increment_score(r,network_scorer(r['properties'].get('CidrIpv4'))) for r in filtered_list]
         [increment_score(r,1) for r in filtered_list if (r['properties']['FromPort'] == flow['port'] or r['properties']['ToPort'] == flow['port'])]
         [increment_score(r,0.5) for r in filtered_list if flow['port'] in range(int(r['properties']['FromPort']), int(r['properties']['ToPort'])+1)]
