@@ -14,7 +14,18 @@ from hashlib import sha1
 from functools import lru_cache
 from copy import deepcopy
 
-args = getResolvedOptions(sys.argv, ['region', 'FlowLogsAthenaResultsBucket', 'SGRulesTable', 'SGRulesGroupIndex', 'NICInterfaceTable', 'DynamoTableName', 'SGARulesUseIndex', 'path'])
+args = getResolvedOptions(sys.argv, 
+    [
+        'region', 
+        'FlowLogsAthenaResultsBucket', 
+        'SGRulesTable', 
+        'SGRulesGroupIndex', 
+        'NICInterfaceTable', 
+        'DynamoTableName', 
+        'SGARulesUseIndex', 
+        'SGSortTableName',
+        'path'
+    ])
 
 s3 = boto3.resource('s3', args['region'])
 dynamodb = boto3.client('dynamodb', args['region'])
@@ -25,6 +36,7 @@ sg_rules_group_idx = args["SGRulesGroupIndex"]
 nic_interface_tbl= args["NICInterfaceTable"]
 dynamodb_tbl_name= args["DynamoTableName"]
 sg_analysis_rules_use_idx= args["SGARulesUseIndex"]
+sg_sort_table= args["SGSortTableName"]
 athena_s3_prefix = args['path']
 date_yst = (date.today() - timedelta(1))
 
