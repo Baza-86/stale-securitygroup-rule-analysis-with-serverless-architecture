@@ -88,6 +88,15 @@ def ref_rule_dict_builder(ref_rule,ip_address):
     rr = deepcopy(ref_rule)
     rr['properties']['CidrIpv4'] = f'{ip_address}/32'
     return rr
+
+def port_test(rule_port_from,rule_port_to,flow_port):
+    if rule_port_from == -1 and rule_port_to == -1:
+        return True
+    elif flow_port in range(rule_port_from,rule_port_to+1):
+        return True
+    else:
+        return False
+
 def rule_matcher(resp_list,flow):
     [r.setdefault('match_score',1) for r in resp_list]
     if len(resp_list) == 1:
