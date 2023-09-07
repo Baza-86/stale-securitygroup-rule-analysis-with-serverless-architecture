@@ -456,6 +456,11 @@ Resources:
                             - ''
                             - - !GetAtt DynamoTableENIAnalysis.Arn
                               - "/*"
+                        - !GetAtt DynamoTableSortSG.Arn
+                        - !Join
+                            - ''
+                            - - !GetAtt DynamoTableSortSG.Arn
+                              - "/*"
               - PolicyName: GlueJobDynamoDBReadWritePolicy
                 PolicyDocument:
                   Version: '2012-10-17'
