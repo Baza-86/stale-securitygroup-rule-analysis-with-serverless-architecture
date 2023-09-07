@@ -507,6 +507,7 @@ Resources:
                 --FlowLogsAthenaResultsBucket: !ImportValue sga-athena-bucket-ref
                 --SGRulesTable: !Ref DynamoTableSGRules
                 --SGRulesGroupIndex: "groups"
+                --SGSortTableName: !Ref DynamoTableSortSG
                 --NICInterfaceTable: !Ref DynamoTableENIAnalysis
                 --DynamoTableName: !Ref DynamoTableSGAnalysis
                 --SGARulesUseIndex: "addr-id-index"
