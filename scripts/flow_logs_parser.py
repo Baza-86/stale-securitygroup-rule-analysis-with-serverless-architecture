@@ -92,7 +92,7 @@ def ref_rule_dict_builder(ref_rule,ip_address):
 def port_test(rule_port_from,rule_port_to,flow_port):
     if rule_port_from == -1 and rule_port_to == -1:
         return True
-    elif flow_port in range(rule_port_from,rule_port_to+1):
+    elif flow_port in range(int(rule_port_from),int(rule_port_to)+1):
         return True
     else:
         return False
@@ -144,7 +144,7 @@ def get_sg_rule_id(sg_id, flow_count, protocol, flow_dir, addr, dstport):
             resp_list = [{k: deserializer.deserialize(v) for k, v in r.items()} for r in response['Items'] if r['properties']['M']['IsEgress']['BOOL'] == True]
         else:
             resp_list = [{k: deserializer.deserialize(v) for k, v in r.items()} for r in response['Items'] if r['properties']['M']['IsEgress']['BOOL'] == False]
-
+        
         try:
             result = rule_matcher(resp_list,flow_object)[0]
             print(f"rule found for flow: sg_rule_id={result['id']},sg_id={result['group_id']},flow_dir={flow_dir},protocol={flow_object['protocol']},addr={flow_object['addr']},dstport={flow_object['port']}")
