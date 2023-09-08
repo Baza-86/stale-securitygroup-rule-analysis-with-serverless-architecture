@@ -11,8 +11,21 @@ from awsglue.utils import getResolvedOptions
 from boto3.dynamodb.types import TypeDeserializer, TypeSerializer
 from ipaddress import IPv4Address, IPv4Network
 from hashlib import sha1
+from functools import lru_cache
+from copy import deepcopy
 
-args = getResolvedOptions(sys.argv, ['region', 'FlowLogsAthenaResultsBucket', 'SGRulesTable', 'SGRulesGroupIndex', 'NICInterfaceTable', 'DynamoTableName', 'SGARulesUseIndex', 'path'])
+args = getResolvedOptions(sys.argv, 
+    [
+        'region', 
+        'FlowLogsAthenaResultsBucket', 
+        'SGRulesTable', 
+        'SGRulesGroupIndex', 
+        'NICInterfaceTable', 
+        'DynamoTableName', 
+        'SGARulesUseIndex', 
+        'SGSortTableName',
+        'path'
+    ])
 
 s3 = boto3.resource('s3', args['region'])
 dynamodb = boto3.client('dynamodb', args['region'])
@@ -23,6 +36,7 @@ sg_rules_group_idx = args["SGRulesGroupIndex"]
 nic_interface_tbl= args["NICInterfaceTable"]
 dynamodb_tbl_name= args["DynamoTableName"]
 sg_analysis_rules_use_idx= args["SGARulesUseIndex"]
+sg_sort_table= args["SGSortTableName"]
 athena_s3_prefix = args['path']
 date_yst = (date.today() - timedelta(1))
 
@@ -52,12 +66,50 @@ def network_scorer(rule_block):
     network_score = IPv4Network(rule_block).prefixlen
     return network_score
 
+def rule_filter(resp_list):
+    ref_rules = [r for r in resp_list if r['properties'].get('ReferencedGroupInfo')]
+    cidr_rules = [r for r in resp_list if r['properties'].get('CidrIpv4')]
+    return (ref_rules,cidr_rules)
+
+@lru_cache(maxsize=32)
+def get_sg_ref_ips(sg_id):
+    deserialize = TypeDeserializer()
+    response = dynamodb.get_item(
+        TableName=sg_sort_table,
+        Key={'id':{'S':sg_id}}
+    )
+    if 'Item' in response:
+        ref_ips = {k: deserialize.deserialize(v) for k, v in response['Item'].items()}['ip_addresses']
+        return ref_ips
+    else:
+        print (f'sg id: {sg_id} not found!')
+
+def ref_rule_dict_builder(ref_rule,ip_address):
+    rr = deepcopy(ref_rule)
+    rr['properties']['CidrIpv4'] = f'{ip_address}/32'
+    return rr
+
+def port_test(rule_port_from,rule_port_to,flow_port):
+    if rule_port_from == -1 and rule_port_to == -1:
+        return True
+    elif flow_port in range(int(rule_port_from),int(rule_port_to)+1):
+        return True
+    else:
+        return False
+
 def rule_matcher(resp_list,flow):
-    [r.setdefault('match_score',1) for r in resp_list]
+    [r.update({'match_score':1}) for r in resp_list]
     if len(resp_list) == 1:
         return resp_list
     else:
-        filtered_list = [r for r in resp_list if network_test(r['properties'].get('CidrIpv4'),flow['addr']) and protocol_test(r['properties']['IpProtocol'],flow['protocol'])]
+        ref_rules,cidr_rules = rule_filter(resp_list)
+    if len(ref_rules) > 0:
+        for ref in ref_rules:
+            ip_addresses = get_sg_ref_ips(ref['properties'].get('ReferencedGroupInfo')['GroupId'])
+            for ip in ip_addresses:
+                cidr_rules.append(ref_rule_dict_builder(ref,ip))
+    if len(cidr_rules) > 0:
+        filtered_list = [r for r in cidr_rules if network_test(r['properties'].get('CidrIpv4'),flow['addr']) and protocol_test(r['properties']['IpProtocol'],flow['protocol']) and port_test(r['properties'].get('FromPort'),r['properties'].get('ToPort'),flow['port'])]
         [increment_score(r,network_scorer(r['properties'].get('CidrIpv4'))) for r in filtered_list]
         [increment_score(r,1) for r in filtered_list if (r['properties']['FromPort'] == flow['port'] or r['properties']['ToPort'] == flow['port'])]
         [increment_score(r,0.5) for r in filtered_list if flow['port'] in range(int(r['properties']['FromPort']), int(r['properties']['ToPort'])+1)]
@@ -92,7 +144,7 @@ def get_sg_rule_id(sg_id, flow_count, protocol, flow_dir, addr, dstport):
             resp_list = [{k: deserializer.deserialize(v) for k, v in r.items()} for r in response['Items'] if r['properties']['M']['IsEgress']['BOOL'] == True]
         else:
             resp_list = [{k: deserializer.deserialize(v) for k, v in r.items()} for r in response['Items'] if r['properties']['M']['IsEgress']['BOOL'] == False]
-
+        
         try:
             result = rule_matcher(resp_list,flow_object)[0]
             print(f"rule found for flow: sg_rule_id={result['id']},sg_id={result['group_id']},flow_dir={flow_dir},protocol={flow_object['protocol']},addr={flow_object['addr']},dstport={flow_object['port']}")
