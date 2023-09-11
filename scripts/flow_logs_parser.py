@@ -13,6 +13,8 @@ from ipaddress import IPv4Address, IPv4Network
 from hashlib import sha1
 from functools import lru_cache
 from copy import deepcopy
+import functools
+import statistics
 
 args = getResolvedOptions(sys.argv, 
     [
@@ -198,6 +200,22 @@ def insert_usage_data(sg_rule_id, sg_id, flow_dir, flow_count, addr, port, proto
         print("There was an error while trying to perform DynamoDB insert operation on Usage table: "+str(e))
         # raise e
 
+myList = []
+
+def timer(func):
+    @functools.wraps(func)
+    def wrapper_timer(*args, **kwargs):
+        tic = time.perf_counter()
+        value = func(*args, **kwargs)
+        toc = time.perf_counter()
+        elapsed_time = toc - tic
+        myList.append(elapsed_time)
+        print(f"Elapsed time: {elapsed_time:0.4f} seconds")
+        return value
+    return wrapper_timer
+
+@lru_cache(maxsize=1024)
+@timer
 def get_interface_ddb(id:str) -> dict:
     deserialize = TypeDeserializer()
     response = dynamodb.get_item(
@@ -209,6 +227,8 @@ def get_interface_ddb(id:str) -> dict:
         return nic_dict
     else:
         print (f'nic id: {id} not found!')
+
+
 
 
 def main():
@@ -224,7 +244,7 @@ def main():
                 print(f'processing row {index} of {df_row_count}')
                 if row is not None and 'dstport' in row:
                     nw_int_info = get_interface_ddb(id=row['interface_id'])
-                
+                    
                     for grp in nw_int_info['security_group_ids']:
                         print(grp, row['flow_count'], row['protocol'],row['flow_direction'],row['addr'],row['dstport'])
                         get_sg_rule_id(grp, row['flow_count'], row['protocol'],row['flow_direction'],row['addr'],row['dstport'])
@@ -233,7 +253,9 @@ def main():
         except Exception as e:
             print(f'error: {e}')
             # raise e
-    
+
+    print(get_interface_ddb.cache_info())
+    print(statistics.mean(myList))
     print("Writing rules data to DynamoDB table- completed at: "+str(datetime.now()))
     end = time.time()
     print("Total time taken in minutes: "+str((end - start)/60))
