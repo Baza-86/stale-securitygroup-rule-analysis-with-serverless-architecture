@@ -7,6 +7,9 @@ Parameters:
   SgaEniLambdaArn:
     Type: String
     Description: The arn of the role assumed by the SgaGetEniLambda function in the SGA account
+  SgaSortSGLambdaArn:
+    Type: String
+    Description: The arn of the role assumed by the SgaSortSGLambda function in the SGA account
 Resources:
     SgaCrossAccountSgIAMRole:
         Type: AWS::IAM::Role
@@ -47,7 +50,7 @@ Resources:
                     - !Ref SgaEniLambdaArn
                 Action: sts:AssumeRole
           Policies:
-            - PolicyName: DescribeSecurityGroupsPolicy
+            - PolicyName: DescribeNetworkInterfacesPolicy
               PolicyDocument:
                 Version: '2012-10-17'
                 Statement:
@@ -57,4 +60,40 @@ Resources:
                       - ec2:DescribeTags
                       - ec2:DescribeNetworkAcls
                       - ec2:DescribeRouteTables
+                    Resource: "*"
+
+    SgaCrossAccountSgrIAMRole:
+        Type: AWS::IAM::Role
+        Properties:
+          RoleName: SgaCrossAccountSgrIAMRole
+          Path: /
+          AssumeRolePolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Principal:
+                  AWS:
+                    - !Ref SgaSortSGLambdaArn
+                Action: sts:AssumeRole
+          Policies:
+            - PolicyName: DescribeNetworkInterfacesPolicy
+              PolicyDocument:
+                Version: '2012-10-17'
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - ec2:DescribeNetworkInterfaces
+                      - ec2:DescribeTags
+                      - ec2:DescribeNetworkAcls
+                      - ec2:DescribeRouteTables
+                    Resource: "*"
+            - PolicyName: DescribeSecurityGroupsPolicy
+              PolicyDocument:
+                Version: '2012-10-17'
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - ec2:DescribeSecurityGroups
+                      - ec2:DescribeSecurityGroupReferences
+                      - ec2:DescribeSecurityGroupRules
                     Resource: "*"

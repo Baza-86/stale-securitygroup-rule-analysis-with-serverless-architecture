@@ -47,6 +47,7 @@ Resources:
                     Resource:
                       - !GetAtt SgaGetSgLambda.Arn
                       - !GetAtt SgaGetEniLambda.Arn
+                      - !GetAtt SgaSortSGLambda.Arn
             - PolicyName: SgaSfCwlStepFunctions
               PolicyDocument:
                 Version: '2012-10-17'
@@ -149,15 +150,24 @@ Resources:
     DynamoTableENIAnalysis:
         Type: "AWS::DynamoDB::Table"
         Properties:
+          BillingMode: PAY_PER_REQUEST
           AttributeDefinitions:
             - AttributeName: id
               AttributeType: S
           KeySchema:
             - AttributeName: id
               KeyType: HASH
-          ProvisionedThroughput:
-            ReadCapacityUnits: 5
-            WriteCapacityUnits: 5
+
+    DynamoTableSortSG:
+        Type: "AWS::DynamoDB::Table"
+        Properties:
+          BillingMode: PAY_PER_REQUEST
+          AttributeDefinitions:
+            - AttributeName: id
+              AttributeType: S
+          KeySchema:
+            - AttributeName: id
+              KeyType: HASH
 
     StepFunctionsStateMachine:
         Type: "AWS::StepFunctions::StateMachine"
@@ -195,6 +205,26 @@ Resources:
                           "GetENI": {
                             "Type": "Task",
                             "Resource": "${SgaGetEniLambda.Arn}",
+                            "InputPath": "$",
+                            "Retry": [
+                              {
+                                "ErrorEquals": [
+                                  "Lambda.ServiceException",
+                                  "Lambda.AWSLambdaException",
+                                  "Lambda.SdkClientException",
+                                  "Lambda.TooManyRequestsException"
+                                ],
+                                "IntervalSeconds": 2,
+                                "MaxAttempts": 6,
+                                "BackoffRate": 2
+                              }
+                            ],
+                            "Next": "SortSGs",
+                            "ResultPath": null
+                          },
+                          "SortSGs": {
+                            "Type": "Task",
+                            "Resource": "${SgaSortSGLambda.Arn}",
                             "InputPath": "$",
                             "Retry": [
                               {
@@ -426,6 +456,11 @@ Resources:
                             - ''
                             - - !GetAtt DynamoTableENIAnalysis.Arn
                               - "/*"
+                        - !GetAtt DynamoTableSortSG.Arn
+                        - !Join
+                            - ''
+                            - - !GetAtt DynamoTableSortSG.Arn
+                              - "/*"
               - PolicyName: GlueJobDynamoDBReadWritePolicy
                 PolicyDocument:
                   Version: '2012-10-17'
@@ -473,6 +508,7 @@ Resources:
                 --FlowLogsAthenaResultsBucket: !ImportValue sga-athena-bucket-ref
                 --SGRulesTable: !Ref DynamoTableSGRules
                 --SGRulesGroupIndex: "groups"
+                --SGSortTableName: !Ref DynamoTableSortSG
                 --NICInterfaceTable: !Ref DynamoTableENIAnalysis
                 --DynamoTableName: !Ref DynamoTableSGAnalysis
                 --SGARulesUseIndex: "addr-id-index"
@@ -598,3 +634,63 @@ Resources:
         Code:
           S3Bucket: !ImportValue sga-resources-bucket-ref
           S3Key: KS-Test-SgaGetEniLambda-zTqrdlSrwIes-dd6156a0-4ad4-441c-b0ea-4ad738306e4d.zip
+
+    SgaSortSGLambdaIAMRole:
+        Type: AWS::IAM::Role
+        Properties:
+          AssumeRolePolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Principal:
+                  Service: lambda.amazonaws.com
+                Action: sts:AssumeRole
+          Path: /
+          ManagedPolicyArns:
+            - !Ref SgaCloudWatchLogsPolicy
+          Policies:
+            - PolicyName: DescribeSecurityGroupsPolicy
+              PolicyDocument:
+                Version: '2012-10-17'
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - ec2:DescribeNetworkInterfaces
+                      - ec2:DescribeTags
+                      - ec2:DescribeNetworkAcls
+                      - ec2:DescribeRouteTables
+                    Resource: "*"
+            - PolicyName: DynamoDBPermissions
+              PolicyDocument:
+                Version: '2012-10-17'
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - dynamodb:PutItem
+                      - dynamodb:Query
+                    Resource: !GetAtt DynamoTableSortSG.Arn
+            - PolicyName: AssumeCrossAccountRole
+              PolicyDocument:
+                Version: '2012-10-17'
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - sts:AssumeRole
+                    Resource: arn:aws:iam::*:role/SgaCrossAccountSgrIAMRole
+
+    SgaSortSGLambda:
+      Type: "AWS::Lambda::Function"
+      Properties:
+        Role: !GetAtt SgaSortSGLambdaIAMRole.Arn
+        Handler: lambda_function.lambda_handler
+        Environment:
+          Variables:
+            DB_TABLE: !Ref DynamoTableSortSG
+            # Define CROSS_ACCOUNT_ROLE_NAME here if you want to assume another role e.g. `ARN_ROLE: arn:aws:iam::<AccountNo>:role/<Role>`
+            CROSS_ACCOUNT_ROLE_NAME: SgaCrossAccountSgrIAMRole
+        Runtime: python3.10
+        MemorySize: 256
+        Timeout: 900
+        Code:
+          S3Bucket: !ImportValue sga-resources-bucket-ref
+          S3Key: SortSecurityGroupReferences-33408ae9-78dc-426b-b200-36363544cffc.zip
