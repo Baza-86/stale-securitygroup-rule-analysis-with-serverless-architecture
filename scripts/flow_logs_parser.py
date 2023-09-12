@@ -13,6 +13,8 @@ from ipaddress import IPv4Address, IPv4Network
 from hashlib import sha1
 from functools import lru_cache
 from copy import deepcopy
+import functools
+import statistics
 
 args = getResolvedOptions(sys.argv, 
     [
@@ -120,42 +122,68 @@ def rule_matcher(resp_list,flow):
     
     return max_score_list
 
-def get_sg_rule_id(sg_id, flow_count, protocol, flow_dir, addr, dstport):
-    deserializer = TypeDeserializer()
-    try:
-        
-        response=dynamodb.query(
-            TableName=sg_rules_tbl_name,
-            IndexName=sg_rules_group_idx,
-            KeyConditions={
-                "group_id":{
-                    'ComparisonOperator': 'EQ',
-                    'AttributeValueList': [ {"S": sg_id} ]
-                }
+myList = []
+
+def timer(func):
+    @functools.wraps(func)
+    def wrapper_timer(*args, **kwargs):
+        tic = time.perf_counter()
+        value = func(*args, **kwargs)
+        toc = time.perf_counter()
+        elapsed_time = toc - tic
+        myList.append(elapsed_time)
+        print(f"Elapsed time: {elapsed_time:0.4f} seconds")
+        return value
+    return wrapper_timer
+
+@lru_cache(maxsize=2048)
+def get_sg_rule_id_dynamo_query(sg_id):
+    response=dynamodb.query(
+        TableName=sg_rules_tbl_name,
+        IndexName=sg_rules_group_idx,
+        KeyConditions={
+            "group_id":{
+                'ComparisonOperator': 'EQ',
+                'AttributeValueList': [ {"S": sg_id} ]
             }
-        )
+        }
+    )
+
+    return response
+
+@timer
+def flow_direction_checker(response, flow_dir):
+    deserializer = TypeDeserializer()
+    if flow_dir == 'egress':
+        resp_list = [{k: deserializer.deserialize(v) for k, v in r.items()} for r in response['Items'] if r['properties']['M']['IsEgress']['BOOL'] == True]
+    else:
+        resp_list = [{k: deserializer.deserialize(v) for k, v in r.items()} for r in response['Items'] if r['properties']['M']['IsEgress']['BOOL'] == False]
+    return resp_list
+
+def get_sg_rule_id(sg_id, flow_count, protocol, flow_dir, addr, dstport):
+    try:
+        response = get_sg_rule_id_dynamo_query(sg_id)
+
         flow_object = {
             'flow_count': flow_count,
             'addr': addr,
             'port': dstport,
             'protocol': protocol,
         }
-        if flow_dir == 'egress':
-            resp_list = [{k: deserializer.deserialize(v) for k, v in r.items()} for r in response['Items'] if r['properties']['M']['IsEgress']['BOOL'] == True]
-        else:
-            resp_list = [{k: deserializer.deserialize(v) for k, v in r.items()} for r in response['Items'] if r['properties']['M']['IsEgress']['BOOL'] == False]
-        
-        try:
-            result = rule_matcher(resp_list,flow_object)[0]
-            print(f"rule found for flow: sg_rule_id={result['id']},sg_id={result['group_id']},flow_dir={flow_dir},protocol={flow_object['protocol']},addr={flow_object['addr']},dstport={flow_object['port']}")
-            insert_usage_data(sg_rule_id=result['id'],sg_id=result['group_id'],flow_dir=flow_dir,**flow_object)
-        except Exception as e:
-            print(f'no rule found for flow:{flow_object} - {flow_dir}')
-            print(f'error: {e}')
-            # raise e
-        
     except Exception as e: 
         print("There was an error while trying to perform DynamoDB get operation on Rules table: "+str(e))
+       
+    resp_list = flow_direction_checker(response, flow_dir)
+        
+    try:
+        result = rule_matcher(resp_list,flow_object)[0]
+        print(f"rule found for flow: sg_rule_id={result['id']},sg_id={result['group_id']},flow_dir={flow_dir},protocol={flow_object['protocol']},addr={flow_object['addr']},dstport={flow_object['port']}")
+        insert_usage_data(sg_rule_id=result['id'],sg_id=result['group_id'],flow_dir=flow_dir,**flow_object)
+    except Exception as e:
+        print(f'no rule found for flow:{flow_object} - {flow_dir}')
+        print(f'error: {e}')
+        # raise e
+
     
 def insert_usage_data(sg_rule_id, sg_id, flow_dir, flow_count, addr, port, protocol):
     addr_rule_hash = [sg_rule_id,addr,port,protocol]
@@ -198,6 +226,7 @@ def insert_usage_data(sg_rule_id, sg_id, flow_dir, flow_count, addr, port, proto
         print("There was an error while trying to perform DynamoDB insert operation on Usage table: "+str(e))
         # raise e
 
+@lru_cache(maxsize=1024)
 def get_interface_ddb(id:str) -> dict:
     deserialize = TypeDeserializer()
     response = dynamodb.get_item(
@@ -233,7 +262,9 @@ def main():
         except Exception as e:
             print(f'error: {e}')
             # raise e
-    
+
+    # print(flow_direction_checker.cache_info())
+    # print(statistics.mean(myList))
     print("Writing rules data to DynamoDB table- completed at: "+str(datetime.now()))
     end = time.time()
     print("Total time taken in minutes: "+str((end - start)/60))
