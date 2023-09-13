@@ -152,7 +152,7 @@ def get_sg_rule_id_dynamo_query(sg_id):
     return response
 
 @timer
-def flow_direction_checker(response, flow_dir):
+def security_group_rule_parser(response, flow_dir):
     deserializer = TypeDeserializer()
     if flow_dir == 'egress':
         resp_list = [{k: deserializer.deserialize(v) for k, v in r.items()} for r in response['Items'] if r['properties']['M']['IsEgress']['BOOL'] == True]
@@ -173,7 +173,7 @@ def get_sg_rule_id(sg_id, flow_count, protocol, flow_dir, addr, dstport):
     except Exception as e: 
         print("There was an error while trying to perform DynamoDB get operation on Rules table: "+str(e))
        
-    resp_list = flow_direction_checker(response, flow_dir)
+    resp_list = security_group_rule_parser(response, flow_dir)
         
     try:
         result = rule_matcher(resp_list,flow_object)[0]
