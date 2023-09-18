@@ -1,0 +1,92 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Athena
+Resources:
+
+  SgaStepFunctionIAMRole:
+        Type: AWS::IAM::Role
+        Properties:
+          AssumeRolePolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Principal:
+                  Service:
+                  - states.amazonaws.com
+                Action: sts:AssumeRole
+          Path: /
+          ManagedPolicyArns:
+            - arn:aws:iam::aws:policy/AmazonAthenaFullAccess
+            - arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole
+
+  StepFunctionsStateMachine:
+      Type: "AWS::StepFunctions::StateMachine"
+      Properties:
+          DefinitionString: !Sub |
+              {
+                "Comment": "A description of my state machine",
+                "StartAt": "Pass",
+                "States": {
+                  "Pass": {
+                    "Type": "Pass",
+                    "Next": "Athena StartQueryExecution",
+                    "Result": {
+                      "athenaParams": {
+                        "queryString": "SELECT * FROM default.\"security-group-ips\" limit 10;"
+                      }
+                    }
+                  },
+                  "Athena StartQueryExecution": {
+                    "Type": "Task",
+                    "Resource": "arn:aws:states:::athena:startQueryExecution.sync",
+                    "Parameters": {
+                      "QueryString.$": "$.athenaParams.queryString",
+                      "WorkGroup": "primary",
+                      "ResultConfiguration": {
+                        "OutputLocation": "s3://security-group-monitoring-test-bucket-athena/vpcflowlogs/"
+                      }
+                    },
+                    "Next": "Athena GetQueryExecution",
+                    "ResultPath": "$.athenaOutput"
+                  },
+                  "Athena GetQueryExecution": {
+                    "Type": "Task",
+                    "Resource": "arn:aws:states:::athena:getQueryExecution",
+                    "Parameters": {
+                      "QueryExecutionId.$": "$.athenaOutput.QueryExecutionId"
+                    },
+                    "Next": "addQueryParams",
+                    "ResultPath": "$.athenaOutput.Rows"
+                  },
+                  "addQueryParams": {
+                    "Type": "Pass",
+                    "Result": {
+                      "limit": 40000,
+                      "offset": 0
+                    },
+                    "ResultPath": "$.queryParams",
+                    "Next": "queryOutput"
+                  },
+                  "queryOutput": {
+                    "Type": "Pass",
+                    "Result": {
+                      "outputRows": 40000,
+                      "offset": 0,
+                      "queryId": 1
+                    },
+                    "ResultPath": "$.queryOutput",
+                    "Next": "updateOutput"
+                  },
+                  "updateOutput": {
+                    "Type": "Pass",
+                    "End": true,
+                    "Result": {
+                      "outputRows": 40000,
+                      "offset": 40000,
+                      "queryId": 12345
+                    },
+                    "ResultPath": "$.queryOutput"
+                  }
+                }
+              }
+          RoleArn: !GetAtt SgaStepFunctionIAMRole.Arn
+          StateMachineType: "STANDARD"
