@@ -34,7 +34,6 @@ Resources:
                 Action: sts:AssumeRole
           Path: /
           ManagedPolicyArns:
-            - arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole
             - !Ref SgaCloudWatchLogsPolicy
           Policies:
             - PolicyName: SgaSfLambdaInvokePolicy
@@ -48,6 +47,7 @@ Resources:
                       - !GetAtt SgaGetSgLambda.Arn
                       - !GetAtt SgaGetEniLambda.Arn
                       - !GetAtt SgaSortSGLambda.Arn
+                      - !GetAtt PayloadCreatorLambda.Arn
             - PolicyName: SgaSfCwlStepFunctions
               PolicyDocument:
                 Version: '2012-10-17'
@@ -63,6 +63,39 @@ Resources:
                       - logs:DescribeResourcePolicies
                       - logs:DescribeLogGroups
                     Resource: "*"
+            - PolicyName: StepFunctionAthenaPolicy
+              PolicyDocument:
+                Version: '2012-10-17'
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - athena:StartQueryExecution
+                      - athena:GetQueryRuntimeStatistics
+                      - athena:GetQueryExecution
+                      - athena:GetQueryResults
+                      - glue:GetTable
+                      - glue:GetPartitions
+                    Resource: "*"
+            - PolicyName: StepFunctionS3Access
+              PolicyDocument:
+                Version: '2012-10-17'
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - s3:Get*
+                      - s3:List*
+                      - s3:PutObject
+                    Resource:
+                      - !ImportValue sga-athena-bucket-arn
+                      - !Join
+                          - ''
+                          - - !ImportValue sga-athena-bucket-arn
+                            - "/*"
+                      - !Ref SgaVpcFlowLogBucket
+                      - !Join
+                          - ''
+                          - - !Ref SgaVpcFlowLogBucket
+                            - "/*"
 
 
     SgaEventBridgeIAMManagedPolicy:
@@ -199,13 +232,63 @@ Resources:
                                 "BackoffRate": 2
                               }
                             ],
-                            "Next": "GetENI",
+                            "Next": "QueryParameters",
                             "ResultPath": null
                           },
-                          "GetENI": {
+                          "QueryParameters": {
+                            "Type": "Pass",
+                            "Next": "Athena StartQueryExecution",
+                            "Parameters": {
+                              "queryParams": {
+                                "queryString.$": "States.Format('{}{}{}', 'SELECT * FROM \"vpcflowlogsathenadatabase\".\"', $.table, '\" offset {} limit 10;')",
+                                "outputLocation.$": "States.Format('{}{}', 's3://${sga-athena-bucket-ref}/', $.path)",
+                                "queryOffset": 0
+                              },
+                              "outputFileArray": [],
+                              "data.$": "$"
+                            }
+                          },
+                          "Athena StartQueryExecution": {
                             "Type": "Task",
-                            "Resource": "${SgaGetEniLambda.Arn}",
-                            "InputPath": "$",
+                            "Resource": "arn:aws:states:::athena:startQueryExecution.sync",
+                            "Parameters": {
+                              "QueryString.$": "States.Format($.queryParams.queryString,$.queryParams.queryOffset)",
+                              "WorkGroup": "primary",
+                              "ResultConfiguration": {
+                                "OutputLocation.$": "$.queryParams.outputLocation"
+                              }
+                            },
+                            "Next": "GetQueryRuntimeStatistics",
+                            "ResultPath": "$.athenaQuery",
+                            "ResultSelector": {
+                              "queryExecutionId.$": "$.QueryExecution.QueryExecutionId",
+                              "outputCsv.$": "States.Format('{}.csv',$.QueryExecution.QueryExecutionId)"
+                            }
+                          },
+                          "GetQueryRuntimeStatistics": {
+                            "Type": "Task",
+                            "Next": "PayloadCreator",
+                            "Parameters": {
+                              "QueryExecutionId.$": "$.athenaQuery.queryExecutionId"
+                            },
+                            "Resource": "arn:aws:states:::aws-sdk:athena:getQueryRuntimeStatistics",
+                            "ResultSelector": {
+                              "outputRows.$": "$.QueryRuntimeStatistics.OutputStage.OutputRows"
+                            },
+                            "ResultPath": "$.queryRows"
+                          },
+                          "PayloadCreator": {
+                            "Type": "Task",
+                            "Resource": "arn:aws:states:::aws-sdk:lambda:invoke",
+                            "Parameters": {
+                              "FunctionName": "${PayloadCreatorLambda.Arn}",
+                              "Payload": {
+                                "outputCsv.$": "$.athenaQuery.outputCsv",
+                                "queryParams.$": "$.queryParams",
+                                "outputFileArray.$": "$.outputFileArray",
+                                "outputRows.$": "$.queryRows.outputRows"
+                              }
+                            },
                             "Retry": [
                               {
                                 "ErrorEquals": [
@@ -219,57 +302,44 @@ Resources:
                                 "BackoffRate": 2
                               }
                             ],
-                            "Next": "SortSGs",
-                            "ResultPath": null
+                            "Next": "PayloadFormatter",
+                            "ResultSelector": {
+                              "lambdaResult.$": "States.StringToJson($.Payload)"
+                            },
+                            "ResultPath": "$.LambdaResult"
                           },
-                          "SortSGs": {
-                            "Type": "Task",
-                            "Resource": "${SgaSortSGLambda.Arn}",
-                            "InputPath": "$",
-                            "Retry": [
+                          "PayloadFormatter": {
+                            "Type": "Pass",
+                            "Next": "Choice",
+                            "InputPath": "$.LambdaResult.lambdaResult"
+                          },
+                          "Choice": {
+                            "Type": "Choice",
+                            "Choices": [
                               {
-                                "ErrorEquals": [
-                                  "Lambda.ServiceException",
-                                  "Lambda.AWSLambdaException",
-                                  "Lambda.SdkClientException",
-                                  "Lambda.TooManyRequestsException"
-                                ],
-                                "IntervalSeconds": 2,
-                                "MaxAttempts": 6,
-                                "BackoffRate": 2
+                                "Variable": "$.outputRows",
+                                "NumericEquals": 5000,
+                                "Next": "Athena StartQueryExecution"
                               }
                             ],
-                            "Next": "QueryVPCFlowLogsSaveToS3",
-                            "ResultPath": null
+                            "Default": "Map"
                           },
-                          "QueryVPCFlowLogsSaveToS3": {
-                            "Type": "Task",
-                            "Resource": "arn:aws:states:::glue:startJobRun.sync",
-                            "Parameters": {
-                              "JobName": "${SgaStartAthenaQueryGlueJob}",
-                              "Arguments": {
-                                "--region.$": "$.region",
-                                "--table.$": "$.table",
-                                "--path.$": "$.path"
+                          "Map": {
+                            "Type": "Map",
+                            "ItemProcessor": {
+                              "ProcessorConfig": {
+                                "Mode": "INLINE"
+                              },
+                              "StartAt": "Pass",
+                              "States": {
+                                "Pass": {
+                                  "Type": "Pass",
+                                  "End": true
+                                }
                               }
                             },
-                            "Next": "ParseVPCFLowLogsSaveUsageCount",
-                            "InputPath": "$",
-                            "ResultPath": null
-                          },
-                          "ParseVPCFLowLogsSaveUsageCount": {
-                            "Type": "Task",
-                            "Resource": "arn:aws:states:::glue:startJobRun.sync",
-                            "Parameters": {
-                              "JobName": "${SgaParseFlowLogsGlueJob}",
-                              "Arguments": {
-                                "--region.$": "$.region",
-                                "--table.$": "$.table",
-                                "--path.$": "$.path"
-                              }
-                            },
-                            "InputPath": "$",
-                            "End": true
+                            "End": true,
+                            "ItemsPath": "$.outputFileArray"
                           }
                         }
                       },
@@ -694,3 +764,27 @@ Resources:
         Code:
           S3Bucket: !ImportValue sga-resources-bucket-ref
           S3Key: SortSecurityGroupReferences-33408ae9-78dc-426b-b200-36363544cffc.zip
+
+    PayloadCreatorRole:
+        Type: AWS::IAM::Role
+        Properties:
+          AssumeRolePolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Principal:
+                  Service: lambda.amazonaws.com
+                Action: sts:AssumeRole
+          Path: /
+          ManagedPolicyArns:
+            - !Ref SgaCloudWatchLogsPolicy
+
+    PayloadCreatorLambda:
+      Type: "AWS::Lambda::Function"
+      Properties:
+        Role: !GetAtt PayloadCreatorRole.Arn
+        Handler: lambda_function.lambda_handler
+        Runtime: python3.10
+        Code:
+          S3Bucket: !ImportValue sga-resources-bucket-ref
+          S3Key: PayloadCreator-91317348-d033-4739-9d96-4ea90a2a67b9.zip
