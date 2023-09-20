@@ -237,6 +237,7 @@ def insert_usage_data(sg_rule_id, sg_id, flow_dir, flow_count, addr, port, proto
         print("There was an error while trying to perform DynamoDB insert operation on Usage table: "+str(e))
         # raise e
 
+
 @timer(timer_results=get_interface_ddb_results)
 @lru_cache(maxsize=1024)
 def get_interface_ddb(id:str) -> dict:
@@ -252,6 +253,8 @@ def get_interface_ddb(id:str) -> dict:
         print (f'nic id: {id} not found!')
 
 
+
+
 def main():
     s3_folder_path = f's3://{flow_logs_athena_results_bucket}/{athena_s3_prefix}/{date_yst.isoformat().replace("-","/")}/'
     start = time.time()
@@ -265,7 +268,7 @@ def main():
                 print(f'processing row {index} of {df_row_count}')
                 if row is not None and 'dstport' in row:
                     nw_int_info = get_interface_ddb(id=row['interface_id'])
-                
+                    
                     for grp in nw_int_info['security_group_ids']:
                         print(grp, row['flow_count'], row['protocol'],row['flow_direction'],row['addr'],row['dstport'])
                         get_sg_rule_id(grp, row['flow_count'], row['protocol'],row['flow_direction'],row['addr'],row['dstport'])
@@ -293,6 +296,7 @@ def main():
     
     print(f'quantiles for get_interface_ddb: {statistics.quantiles(get_interface_ddb_results)}')
     
+
     print("Writing rules data to DynamoDB table- completed at: "+str(datetime.now()))
     end = time.time()
     print("Total time taken in minutes: "+str((end - start)/60))
