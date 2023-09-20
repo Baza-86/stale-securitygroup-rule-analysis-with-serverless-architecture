@@ -44,6 +44,27 @@ date_yst = (date.today() - timedelta(1))
 
 my_bucket = s3.Bucket(flow_logs_athena_results_bucket)
 
+sg_rule_id_query_results = []
+get_sg_ref_ips_results = []
+rule_matcher_results = []
+security_group_rule_parser_results = []
+get_sg_rule_id_results = []
+get_interface_ddb_results = []
+
+def timer(timer_results):
+    def timer_decorator(func):
+        @functools.wraps(func)
+        def wrapper_timer(*args, **kwargs):
+            tic = time.perf_counter()
+            value = func(*args, **kwargs)
+            toc = time.perf_counter()
+            elapsed_time = toc - tic
+            timer_results.append(elapsed_time)
+            print(f"Elapsed time: {elapsed_time:0.4f} seconds")
+            return value
+        return wrapper_timer
+    return timer_decorator
+
 def network_test(rule_block,flow_addr):
     net = IPv4Network(rule_block)
     addr = IPv4Address(flow_addr)
@@ -73,6 +94,7 @@ def rule_filter(resp_list):
     cidr_rules = [r for r in resp_list if r['properties'].get('CidrIpv4')]
     return (ref_rules,cidr_rules)
 
+@timer(timer_results=get_sg_ref_ips_results)
 @lru_cache(maxsize=32)
 def get_sg_ref_ips(sg_id):
     deserialize = TypeDeserializer()
@@ -98,7 +120,7 @@ def port_test(rule_port_from,rule_port_to,flow_port):
         return True
     else:
         return False
-
+@timer(timer_results=rule_matcher_results)
 def rule_matcher(resp_list,flow):
     [r.update({'match_score':1}) for r in resp_list]
     if len(resp_list) == 1:
@@ -122,20 +144,8 @@ def rule_matcher(resp_list,flow):
     
     return max_score_list
 
-myList = []
 
-def timer(func):
-    @functools.wraps(func)
-    def wrapper_timer(*args, **kwargs):
-        tic = time.perf_counter()
-        value = func(*args, **kwargs)
-        toc = time.perf_counter()
-        elapsed_time = toc - tic
-        myList.append(elapsed_time)
-        print(f"Elapsed time: {elapsed_time:0.4f} seconds")
-        return value
-    return wrapper_timer
-
+@timer(timer_results=sg_rule_id_query_results)
 @lru_cache(maxsize=2048)
 def get_sg_rule_id_dynamo_query(sg_id):
     response=dynamodb.query(
@@ -151,7 +161,7 @@ def get_sg_rule_id_dynamo_query(sg_id):
 
     return response
 
-@timer
+@timer(timer_results=security_group_rule_parser_results)
 def security_group_rule_parser(response, flow_dir):
     deserializer = TypeDeserializer()
     if flow_dir == 'egress':
@@ -160,6 +170,7 @@ def security_group_rule_parser(response, flow_dir):
         resp_list = [{k: deserializer.deserialize(v) for k, v in r.items()} for r in response['Items'] if r['properties']['M']['IsEgress']['BOOL'] == False]
     return resp_list
 
+@timer(timer_results=get_sg_rule_id_results)
 def get_sg_rule_id(sg_id, flow_count, protocol, flow_dir, addr, dstport):
     try:
         response = get_sg_rule_id_dynamo_query(sg_id)
@@ -226,6 +237,7 @@ def insert_usage_data(sg_rule_id, sg_id, flow_dir, flow_count, addr, port, proto
         print("There was an error while trying to perform DynamoDB insert operation on Usage table: "+str(e))
         # raise e
 
+@timer(timer_results=get_interface_ddb_results)
 @lru_cache(maxsize=1024)
 def get_interface_ddb(id:str) -> dict:
     deserialize = TypeDeserializer()
@@ -262,9 +274,25 @@ def main():
         except Exception as e:
             print(f'error: {e}')
             # raise e
-
-    # print(flow_direction_checker.cache_info())
-    # print(statistics.mean(myList))
+    
+    #print(f'sg_rule_id_query cache stats')
+    #print(get_sg_rule_id_dynamo_query.cache_info())
+    print(f'quantiles for sg_rule_id_query: {statistics.quantiles(sg_rule_id_query_results)}')
+    
+    #print(f'get_sg_ref_ips cache stats')
+    #print(get_sg_ref_ips.cache_info())
+    print(f'quantiles for get_sg_ref_ips: {statistics.quantiles(get_sg_ref_ips_results)}')
+    
+    print(f'quantiles for rule_matcher: {statistics.quantiles(rule_matcher_results)}')
+    
+    #print(f'security_group_rule_parser cache stats')
+    #print(security_group_rule_parser.cache_info())
+    print(f'quantiles for security_group_rule_parser: {statistics.quantiles(security_group_rule_parser_results)}')
+    
+    print(f'quantiles for get_sg_rule_id: {statistics.quantiles(get_sg_rule_id_results)}')
+    
+    print(f'quantiles for get_interface_ddb: {statistics.quantiles(get_interface_ddb_results)}')
+    
     print("Writing rules data to DynamoDB table- completed at: "+str(datetime.now()))
     end = time.time()
     print("Total time taken in minutes: "+str((end - start)/60))
