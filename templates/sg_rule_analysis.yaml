@@ -205,7 +205,8 @@ Resources:
     StepFunctionsStateMachine:
         Type: "AWS::StepFunctions::StateMachine"
         Properties:
-            DefinitionString: !Sub |
+            DefinitionString: !Sub 
+              - |
                 {
                   "StartAt": "ProcessItems",
                   "States": {
@@ -241,7 +242,7 @@ Resources:
                             "Parameters": {
                               "queryParams": {
                                 "queryString.$": "States.Format('{}{}{}', 'SELECT * FROM \"vpcflowlogsathenadatabase\".\"', $.table, '\" offset {} limit 10;')",
-                                "outputLocation.$": "States.Format('{}{}', 's3://${sga-athena-bucket-ref}/', $.path)",
+                                "outputLocation.$": "States.Format('{}{}', 's3://${AthenaBucket}/', $.path)",
                                 "queryOffset": 0
                               },
                               "outputFileArray": [],
@@ -347,6 +348,7 @@ Resources:
                     }
                   }
                 }
+              - AthenaBucket: !ImportValue sga-athena-bucket-ref
             RoleArn: !GetAtt SgaStepFunctionIAMRole.Arn
             StateMachineType: "STANDARD"
             LoggingConfiguration:
