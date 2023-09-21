@@ -238,10 +238,10 @@ Resources:
                           },
                           "QueryParameters": {
                             "Type": "Pass",
-                            "Next": "Athena StartQueryExecution",
+                            "Next": "DateGenerator",
                             "Parameters": {
                               "queryParams": {
-                                "queryString.$": "States.Format('{}{}{}', 'SELECT * FROM \"vpcflowlogsathenadatabase\".\"', $.table, '\" offset {} limit 10;')",
+                                "queryString": "SELECT count(\"interface_id\") as flow_count, interface_id, protocol, flow_direction, if(\"flow_direction\"='ingress',\"srcaddr\",\"dstaddr\") as addr, dstport FROM \"vpcflowlogsathenadatabase\".\"{}\" WHERE dstport is not null and day='{}' and action='ACCEPT' group by interface_id, protocol, flow_direction, if(\"flow_direction\"='ingress',\"srcaddr\",\"dstaddr\"), dstport, dstport having count(interface_id) > 5  order by interface_id, flow_count desc offset {} limit 10",
                                 "outputLocation.$": "States.Format('{}{}', 's3://${AthenaBucket}/', $.path)",
                                 "queryOffset": 0
                               },
@@ -249,11 +249,37 @@ Resources:
                               "data.$": "$"
                             }
                           },
+                          "DateGenerator": {
+                            "Type": "Task",
+                            "Resource": "arn:aws:states:::aws-sdk:lambda:invoke",
+                            "Parameters": {
+                              "FunctionName": "${PayloadCreatorLambda.Arn}",
+                              "Payload.$": "$"
+                            },
+                            "Retry": [
+                              {
+                                "ErrorEquals": [
+                                  "Lambda.ServiceException",
+                                  "Lambda.AWSLambdaException",
+                                  "Lambda.SdkClientException",
+                                  "Lambda.TooManyRequestsException"
+                                ],
+                                "IntervalSeconds": 2,
+                                "MaxAttempts": 6,
+                                "BackoffRate": 2
+                              }
+                            ],
+                            "Next": "Athena StartQueryExecution",
+                            "ResultPath": "$.generatedDate",
+                            "ResultSelector": {
+                              "date.$": "States.StringToJson($.Payload)"
+                            }
+                          },
                           "Athena StartQueryExecution": {
                             "Type": "Task",
                             "Resource": "arn:aws:states:::athena:startQueryExecution.sync",
                             "Parameters": {
-                              "QueryString.$": "States.Format($.queryParams.queryString,$.queryParams.queryOffset)",
+                              "QueryString.$": "States.Format($.queryParams.queryString, $.data.table, $.generatedDate.date.date, $.queryParams.queryOffset)",
                               "WorkGroup": "primary",
                               "ResultConfiguration": {
                                 "OutputLocation.$": "$.queryParams.outputLocation"
@@ -287,7 +313,8 @@ Resources:
                                 "outputCsv.$": "$.athenaQuery.outputCsv",
                                 "queryParams.$": "$.queryParams",
                                 "outputFileArray.$": "$.outputFileArray",
-                                "outputRows.$": "$.queryRows.outputRows"
+                                "outputRows.$": "$.queryRows.outputRows",
+                                "generatedDate.$": "$.generatedDate"
                               }
                             },
                             "Retry": [
@@ -789,4 +816,4 @@ Resources:
         Runtime: python3.10
         Code:
           S3Bucket: !ImportValue sga-resources-bucket-ref
-          S3Key: PayloadCreator-91317348-d033-4739-9d96-4ea90a2a67b9.zip
+          S3Key: PayloadCreator-0e113585-425b-4e8e-b82d-077e3d697b78.zip
