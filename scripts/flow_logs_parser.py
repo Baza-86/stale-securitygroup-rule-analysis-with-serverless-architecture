@@ -26,7 +26,8 @@ args = getResolvedOptions(sys.argv,
         'DynamoTableName', 
         'SGARulesUseIndex', 
         'SGSortTableName',
-        'path'
+        'path',
+        'QueryCsv'
     ])
 
 s3 = boto3.resource('s3', args['region'])
@@ -40,6 +41,7 @@ dynamodb_tbl_name= args["DynamoTableName"]
 sg_analysis_rules_use_idx= args["SGARulesUseIndex"]
 sg_sort_table= args["SGSortTableName"]
 athena_s3_prefix = args['path']
+query_csv = args['QueryCsv']
 date_yst = (date.today() - timedelta(1))
 
 my_bucket = s3.Bucket(flow_logs_athena_results_bucket)
@@ -256,10 +258,10 @@ def get_interface_ddb(id:str) -> dict:
 
 
 def main():
-    s3_folder_path = f's3://{flow_logs_athena_results_bucket}/{athena_s3_prefix}/{date_yst.isoformat().replace("-","/")}/'
+    query_csv_path = f's3://{flow_logs_athena_results_bucket}/{athena_s3_prefix}/{date_yst.isoformat().replace("-","/")}/{query_csv}'
     start = time.time()
     print("Writing rules data to DynamoDB table- started at: "+str(datetime.now()))
-    dfs = wr.s3.read_csv(path=s3_folder_path, chunksize=1000, encoding = 'ISO-8859-1')
+    dfs = wr.s3.read_csv(path=query_csv_path, chunksize=1000, encoding = 'ISO-8859-1')
     for df in dfs:
         try:
             df_row_count = len(df) - 1
