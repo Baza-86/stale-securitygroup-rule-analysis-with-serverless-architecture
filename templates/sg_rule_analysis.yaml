@@ -36,6 +36,17 @@ Resources:
           ManagedPolicyArns:
             - !Ref SgaCloudWatchLogsPolicy
           Policies:
+            - PolicyName: SgaSfGlueJobPolicy
+              PolicyDocument:
+                Version: '2012-10-17'
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - glue:StartJobRun
+                      - glue:GetJobRun
+                      - glue:GetJobRuns
+                      - glue:BatchStopJobRun
+                    Resource: "*"
             - PolicyName: SgaSfLambdaInvokePolicy
               PolicyDocument:
                 Version: '2012-10-17'
