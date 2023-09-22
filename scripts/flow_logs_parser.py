@@ -27,7 +27,7 @@ args = getResolvedOptions(sys.argv,
         'SGARulesUseIndex', 
         'SGSortTableName',
         'path',
-        'QueryCsv'
+        'queryCsv'
     ])
 
 s3 = boto3.resource('s3', args['region'])
@@ -41,7 +41,7 @@ dynamodb_tbl_name= args["DynamoTableName"]
 sg_analysis_rules_use_idx= args["SGARulesUseIndex"]
 sg_sort_table= args["SGSortTableName"]
 athena_s3_prefix = args['path']
-query_csv = args['QueryCsv']
+query_csv = args['outputCsv']
 date_yst = (date.today() - timedelta(1))
 
 my_bucket = s3.Bucket(flow_logs_athena_results_bucket)
