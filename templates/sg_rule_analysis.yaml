@@ -358,16 +358,30 @@ Resources:
                               "ProcessorConfig": {
                                 "Mode": "INLINE"
                               },
-                              "StartAt": "Pass",
+                              "StartAt": "ParseVPCFLowLogsSaveUsageCount",
                               "States": {
-                                "Pass": {
-                                  "Type": "Pass",
+                                "ParseVPCFLowLogsSaveUsageCount": {
+                                  "Type": "Task",
+                                  "Resource": "arn:aws:states:::glue:startJobRun.sync",
+                                  "Parameters": {
+                                    "JobName": "${SgaParseFlowLogsGlueJob}",
+                                    "Arguments": {
+                                      "--region.$": "$.data.region",
+                                      "--outputCsv.$": "$.outputCsv",
+                                      "--path.$": "$.data.path"
+                                    }
+                                  },
+                                  "InputPath": "$",
                                   "End": true
                                 }
                               }
                             },
                             "End": true,
-                            "ItemsPath": "$.outputFileArray"
+                            "ItemsPath": "$.outputFileArray",
+                            "ItemSelector": {
+                              "data.$": "$.data",
+                              "outputCsv.$": "$$.Map.Item.Value"
+                            }
                           }
                         }
                       },
@@ -611,6 +625,7 @@ Resources:
                 --NICInterfaceTable: !Ref DynamoTableENIAnalysis
                 --DynamoTableName: !Ref DynamoTableSGAnalysis
                 --SGARulesUseIndex: "addr-id-index"
+                --outputCsv: "ouputcsv"
                 --path: "vpcflowlogs"
             MaxRetries: 1
             Timeout: 2880
