@@ -1,4 +1,3 @@
-import json
 from datetime import datetime, timedelta, date
 
 def lambda_handler(event, context):
