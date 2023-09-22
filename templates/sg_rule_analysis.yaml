@@ -666,7 +666,7 @@ Resources:
             Description: "Job to parse flow logs and calculate usage"
             Role: !GetAtt SgaParseFlowLogsGlueJobIAMRole.Arn
             ExecutionProperty: 
-                MaxConcurrentRuns: 1
+                MaxConcurrentRuns: 10
             Command: 
                 Name: "pythonshell"
                 ScriptLocation: !Join
