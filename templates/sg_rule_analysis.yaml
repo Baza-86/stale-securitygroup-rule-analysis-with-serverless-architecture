@@ -380,7 +380,12 @@ Resources:
                           "PayloadFormatter": {
                             "Type": "Pass",
                             "Next": "Choice",
-                            "InputPath": "$.LambdaResult.lambdaResult"
+                            "Parameters": {
+                              "queryParams.$": "$.LambdaResult.lambdaResult.queryParams",
+                              "data.$": "$.data",
+                              "outputRows.$": "$.LambdaResult.lambdaResult.outputRows",
+                              "outputFileArray.$": "$.LambdaResult.lambdaResult.outputFileArray"
+                            }
                           },
                           "Choice": {
                             "Type": "Choice",
