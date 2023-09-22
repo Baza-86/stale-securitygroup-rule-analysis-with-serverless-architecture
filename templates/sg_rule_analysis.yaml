@@ -214,8 +214,19 @@ Resources:
                       "Type": "Map",
                       "ItemsPath": "$.data",
                       "Iterator": {
-                        "StartAt": "GetSG",
+                        "StartAt": "SkipLambdaExecution",
                         "States": {
+                          "SkipLambdaExecution": {
+                            "Type": "Choice",
+                            "Choices": [
+                              {
+                                "Variable": "$.skipLambda",
+                                "BooleanEquals": true,
+                                "Next": "QueryParameters"
+                              }
+                            ],
+                            "Default": "GetSG"
+                          },
                           "GetSG": {
                             "Type": "Task",
                             "Resource": "${SgaGetSgLambda.Arn}",
