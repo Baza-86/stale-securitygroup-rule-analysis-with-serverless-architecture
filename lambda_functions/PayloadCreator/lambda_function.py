@@ -11,7 +11,7 @@ def lambda_handler(event, context):
         
         queryParams = event['queryParams']
         
-        queryParams['queryOffset'] += 10
+        queryParams['queryOffset'] += queryParams['queryLimit']
         
         payload_dict = {
         'queryParams': queryParams,
