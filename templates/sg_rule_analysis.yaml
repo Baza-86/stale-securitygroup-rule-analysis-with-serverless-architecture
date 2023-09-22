@@ -384,7 +384,8 @@ Resources:
                               "queryParams.$": "$.LambdaResult.lambdaResult.queryParams",
                               "data.$": "$.data",
                               "outputRows.$": "$.LambdaResult.lambdaResult.outputRows",
-                              "outputFileArray.$": "$.LambdaResult.lambdaResult.outputFileArray"
+                              "outputFileArray.$": "$.LambdaResult.lambdaResult.outputFileArray",
+                              "generatedDate.$": "$.generatedDate"
                             }
                           },
                           "Choice": {
