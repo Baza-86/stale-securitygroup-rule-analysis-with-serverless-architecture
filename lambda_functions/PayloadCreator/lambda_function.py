@@ -21,9 +21,10 @@ def lambda_handler(event, context):
         print("date to be added to output")
         date_yst = str(date.today() - timedelta(1))
         payload_dict = {
-        'date': date_yst[-2:]
+        'date': date_yst,
+        'day': date_yst.split("-")[2],
+        'month': date_yst.split("-")[1],
+        'year': date_yst.split("-")[0]
     }
-    
-    
     
     return payload_dict

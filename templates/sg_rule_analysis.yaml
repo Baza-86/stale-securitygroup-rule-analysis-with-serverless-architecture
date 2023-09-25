@@ -233,7 +233,7 @@ Resources:
                               {
                                 "Variable": "$.skipLambda",
                                 "BooleanEquals": true,
-                                "Next": "QueryParameters"
+                                "Next": "DateGenerator"
                               }
                             ],
                             "Default": "GetSG"
@@ -295,22 +295,8 @@ Resources:
                                 "BackoffRate": 2
                               }
                             ],
-                            "Next": "QueryParameters",
+                            "Next": "DateGenerator",
                             "ResultPath": null
-                          },
-                          "QueryParameters": {
-                            "Type": "Pass",
-                            "Parameters": {
-                              "queryParams": {
-                                "queryString": "SELECT count(\"interface_id\") as flow_count, interface_id, protocol, flow_direction, if(\"flow_direction\"='ingress',\"srcaddr\",\"dstaddr\") as addr, dstport FROM \"vpcflowlogsathenadatabase\".\"{}\" WHERE dstport is not null and day='{}' and action='ACCEPT' group by interface_id, protocol, flow_direction, if(\"flow_direction\"='ingress',\"srcaddr\",\"dstaddr\"), dstport, dstport having count(interface_id) > 5  order by interface_id, flow_count desc offset {} limit {}",
-                                "outputLocation.$": "States.Format('{}{}', 's3://${AthenaBucket}/', $.path)",
-                                "queryOffset": 0,
-                                "queryLimit": 40000
-                              },
-                              "outputFileArray": [],
-                              "data.$": "$"
-                            },
-                            "Next": "DateGenerator"
                           },
                           "DateGenerator": {
                             "Type": "Task",
@@ -332,20 +318,34 @@ Resources:
                                 "BackoffRate": 2
                               }
                             ],
-                            "Next": "Athena StartQueryExecution",
+                            "Next": "QueryParameters",
                             "ResultPath": "$.generatedDate",
                             "ResultSelector": {
                               "date.$": "States.StringToJson($.Payload)"
                             }
                           },
+                          "QueryParameters": {
+                            "Type": "Pass",
+                            "Parameters": {
+                              "queryParams": {
+                                "queryString": "SELECT count(\"interface_id\") as flow_count, interface_id, protocol, flow_direction, if(\"flow_direction\"='ingress',\"srcaddr\",\"dstaddr\") as addr, dstport FROM \"vpcflowlogsathenadatabase\".\"{}\" WHERE dstport is not null and day='{}' and month='{}' and action='ACCEPT' group by interface_id, protocol, flow_direction, if(\"flow_direction\"='ingress',\"srcaddr\",\"dstaddr\"), dstport, dstport having count(interface_id) > 5  order by interface_id, flow_count desc offset {} limit {}",
+                                "outputLocation": "s3://${AthenaBucket}/{}/{}/{}/{}/",
+                                "queryOffset": 0,
+                                "queryLimit": 40000
+                              },
+                              "outputFileArray": [],
+                              "data.$": "$"
+                            },
+                            "Next": "Athena StartQueryExecution"
+                          },
                           "Athena StartQueryExecution": {
                             "Type": "Task",
                             "Resource": "arn:aws:states:::athena:startQueryExecution.sync",
                             "Parameters": {
-                              "QueryString.$": "States.Format($.queryParams.queryString, $.data.table, $.generatedDate.date.date, $.queryParams.queryOffset, $.queryParams.queryLimit)",
+                              "QueryString.$": "States.Format($.queryParams.queryString, $.data.table, $.data.generatedDate.date.day, $.data.generatedDate.date.month, $.queryParams.queryOffset, $.queryParams.queryLimit)",
                               "WorkGroup": "primary",
                               "ResultConfiguration": {
-                                "OutputLocation.$": "$.queryParams.outputLocation"
+                                "OutputLocation.$": "States.Format($.queryParams.outputLocation, $.data.path, $.data.generatedDate.date.year, $.data.generatedDate.date.month, $.data.generatedDate.date.day)"
                               }
                             },
                             "Next": "GetQueryRuntimeStatistics",
@@ -377,7 +377,7 @@ Resources:
                                 "queryParams.$": "$.queryParams",
                                 "outputFileArray.$": "$.outputFileArray",
                                 "outputRows.$": "$.queryRows.outputRows",
-                                "generatedDate.$": "$.generatedDate"
+                                "generatedDate.$": "$.data.generatedDate"
                               }
                             },
                             "Retry": [
@@ -407,7 +407,7 @@ Resources:
                               "data.$": "$.data",
                               "outputRows.$": "$.LambdaResult.lambdaResult.outputRows",
                               "outputFileArray.$": "$.LambdaResult.lambdaResult.outputFileArray",
-                              "generatedDate.$": "$.generatedDate"
+                              "generatedDate.$": "$.data.generatedDate"
                             }
                           },
                           "Choice": {
