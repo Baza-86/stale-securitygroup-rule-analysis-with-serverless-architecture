@@ -900,4 +900,4 @@ Resources:
         Runtime: python3.10
         Code:
           S3Bucket: !ImportValue sga-resources-bucket-ref
-          S3Key: PayloadCreator-b8da3d40-c0d2-4aa1-b642-2b6669429f62.zip
+          S3Key: PayloadCreatorLambda-h4v5b6lMGO1f-6fa45f3b-0f8b-4e4f-bfbb-89d1238ed13a.zip
