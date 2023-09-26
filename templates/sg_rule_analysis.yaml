@@ -419,17 +419,17 @@ Resources:
                                 "Next": "Athena StartQueryExecution"
                               }
                             ],
-                            "Default": "Map"
+                            "Default": "AnalysisMap"
                           },
-                          "Map": {
+                          "AnalysisMap": {
                             "Type": "Map",
                             "ItemProcessor": {
                               "ProcessorConfig": {
                                 "Mode": "INLINE"
                               },
-                              "StartAt": "ParseVPCFLowLogsSaveUsageCount",
+                              "StartAt": "VpcFlowLogParser",
                               "States": {
-                                "ParseVPCFLowLogsSaveUsageCount": {
+                                "VpcFlowLogParser": {
                                   "Type": "Task",
                                   "Resource": "arn:aws:states:::glue:startJobRun.sync",
                                   "Parameters": {
