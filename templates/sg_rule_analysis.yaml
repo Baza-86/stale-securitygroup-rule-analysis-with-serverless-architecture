@@ -490,7 +490,8 @@ Resources:
                           "AccountNo": "012345678901",
                           "region": "eu-west-2",
                           "table": "SomeGlueTable",
-                          "path": "path/path"
+                          "path": "path/path",
+                          "skipLambda": false
                         }
                       ]
                     }
