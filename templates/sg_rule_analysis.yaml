@@ -471,8 +471,8 @@ Resources:
     EventsRule:
         Type: "AWS::Events::Rule"
         Properties:
-            ScheduleExpression: "cron(30 * * * ? *)"
-            State: "DISABLED"
+            ScheduleExpression: "cron(00 10 ? * MON-FRI *)"
+            State: "ENABLED"
             Targets: 
                 - 
                   Arn:
