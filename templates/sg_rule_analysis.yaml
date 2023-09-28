@@ -437,7 +437,8 @@ Resources:
                                     "Arguments": {
                                       "--region.$": "$.data.region",
                                       "--outputCsv.$": "$.outputCsv",
-                                      "--path.$": "$.data.path"
+                                      "--path.$": "$.data.path",
+                                      "--accountNo.$": "$.data.AccountNo"
                                     }
                                   },
                                   "InputPath": "$",

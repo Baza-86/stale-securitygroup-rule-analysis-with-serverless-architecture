@@ -27,7 +27,8 @@ args = getResolvedOptions(sys.argv,
         'SGARulesUseIndex', 
         'SGSortTableName',
         'path',
-        'queryCsv'
+        'outputCsv',
+        'accountNo'
     ])
 
 s3 = boto3.resource('s3', args['region'])
@@ -42,6 +43,7 @@ sg_analysis_rules_use_idx= args["SGARulesUseIndex"]
 sg_sort_table= args["SGSortTableName"]
 athena_s3_prefix = args['path']
 query_csv = args['outputCsv']
+accountNo = args['accountNo']
 date_yst = (date.today() - timedelta(1))
 
 my_bucket = s3.Bucket(flow_logs_athena_results_bucket)
@@ -173,7 +175,7 @@ def security_group_rule_parser(response, flow_dir):
     return resp_list
 
 @timer(timer_results=get_sg_rule_id_results)
-def get_sg_rule_id(sg_id, flow_count, protocol, flow_dir, addr, dstport):
+def get_sg_rule_id(sg_id, flow_count, protocol, flow_dir, addr, dstport, accountNo):
     try:
         response = get_sg_rule_id_dynamo_query(sg_id)
 
@@ -191,14 +193,14 @@ def get_sg_rule_id(sg_id, flow_count, protocol, flow_dir, addr, dstport):
     try:
         result = rule_matcher(resp_list,flow_object)[0]
         print(f"rule found for flow: sg_rule_id={result['id']},sg_id={result['group_id']},flow_dir={flow_dir},protocol={flow_object['protocol']},addr={flow_object['addr']},dstport={flow_object['port']}")
-        insert_usage_data(sg_rule_id=result['id'],sg_id=result['group_id'],flow_dir=flow_dir,**flow_object)
+        insert_usage_data(sg_rule_id=result['id'],sg_id=result['group_id'],flow_dir=flow_dir, accountNo=accountNo, **flow_object)
     except Exception as e:
         print(f'no rule found for flow:{flow_object} - {flow_dir}')
         print(f'error: {e}')
         # raise e
 
     
-def insert_usage_data(sg_rule_id, sg_id, flow_dir, flow_count, addr, port, protocol):
+def insert_usage_data(sg_rule_id, sg_id, flow_dir, flow_count, addr, port, accountNo, protocol):
     addr_rule_hash = [sg_rule_id,addr,port,protocol]
     hash_digest = sha1(str(addr_rule_hash).encode()).hexdigest()
     try:
@@ -220,6 +222,7 @@ def insert_usage_data(sg_rule_id, sg_id, flow_dir, flow_count, addr, port, proto
                     'dstport': {'N':str(port)},
                     'used_times': {'N':str(flow_count)},
                     'sg_rule_last_used': {'S':date_yst.strftime('%Y-%m-%d')},
+                    'account_no': {'S': accountNo}
                 }
             )
         else:
@@ -273,7 +276,7 @@ def main():
                     
                     for grp in nw_int_info['security_group_ids']:
                         print(grp, row['flow_count'], row['protocol'],row['flow_direction'],row['addr'],row['dstport'])
-                        get_sg_rule_id(grp, row['flow_count'], row['protocol'],row['flow_direction'],row['addr'],row['dstport'])
+                        get_sg_rule_id(grp, row['flow_count'], row['protocol'],row['flow_direction'],row['addr'],row['dstport'], accountNo)
         except KeyError:
             pass
         except Exception as e:
