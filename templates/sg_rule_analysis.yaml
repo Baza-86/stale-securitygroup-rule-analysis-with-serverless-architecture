@@ -169,27 +169,20 @@ Resources:
 
     DynamoTableSGAnalysis:
         Type: "AWS::DynamoDB::Table"
+        DeletionPolicy: Delete
         Properties:
           BillingMode: PAY_PER_REQUEST
-          GlobalSecondaryIndexes:
-            - IndexName: protocol
-              KeySchema:
-              - AttributeName: sg_id
-                KeyType: HASH 
-              - AttributeName: protocol
-                KeyType: RANGE
-              Projection:
-                ProjectionType: ALL
           AttributeDefinitions:
             - AttributeName: sgr_flow_hash
               AttributeType: S
-            - AttributeName: sg_id
-              AttributeType: S
-            - AttributeName: protocol
+            - AttributeName: account_no
               AttributeType: S
           KeySchema:
             - AttributeName: sgr_flow_hash
               KeyType: HASH
+            - AttributeName: account_no
+              KeyType: RANGE
+          
       
     DynamoTableENIAnalysis:
         Type: "AWS::DynamoDB::Table"
@@ -437,7 +430,8 @@ Resources:
                                     "Arguments": {
                                       "--region.$": "$.data.region",
                                       "--outputCsv.$": "$.outputCsv",
-                                      "--path.$": "$.data.path"
+                                      "--path.$": "$.data.path",
+                                      "--accountNo.$": "$.data.AccountNo"
                                     }
                                   },
                                   "InputPath": "$",
