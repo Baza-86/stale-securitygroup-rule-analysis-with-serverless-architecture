@@ -572,7 +572,7 @@ Resources:
                 --prebuilt-library-option: "prebuilt-library-enable"
                 --region: !Ref "AWS::Region"
                 --database: !ImportValue sga-glue-database-ref
-                --table: "sg_analysis_rules_data_ks"
+                --table: "sg_analysis_rules_data"
                 --bucket: !ImportValue sga-athena-bucket-ref
                 --path: "path"
             MaxRetries: 1
@@ -752,7 +752,7 @@ Resources:
         Timeout: 300
         Code:
           S3Bucket: !ImportValue sga-resources-bucket-ref
-          S3Key: KS-Test-SgaGetSgLambda-FU23JMQzQK3h-b0d41471-bd70-4a45-9548-4fa7e8e2c158.zip
+          S3Key: SgaGetSgLambda-FU23JMQzQK3h-b0d41471-bd70-4a45-9548-4fa7e8e2c158.zip
 
     SgaGetEniLambdaIAMRole:
         Type: AWS::IAM::Role
@@ -811,7 +811,7 @@ Resources:
         Timeout: 300
         Code:
           S3Bucket: !ImportValue sga-resources-bucket-ref
-          S3Key: KS-Test-SgaGetEniLambda-zTqrdlSrwIes-dd6156a0-4ad4-441c-b0ea-4ad738306e4d.zip
+          S3Key: SgaGetEniLambda-zTqrdlSrwIes-dd6156a0-4ad4-441c-b0ea-4ad738306e4d.zip
 
     SgaSortSGLambdaIAMRole:
         Type: AWS::IAM::Role
