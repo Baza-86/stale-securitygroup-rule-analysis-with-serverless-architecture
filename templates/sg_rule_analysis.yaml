@@ -4,6 +4,36 @@ Parameters:
   SgaVpcFlowLogBucket:
     Type: String
     Description: The arn of the VPC flow log bucket
+Outputs:
+  DynamoTableSGRules:
+    Description: Name of the Security Group Rules Dynamo DB table
+    Value: !Ref DynamoTableSGRules
+  DynamoTableSGAnalysis:
+    Description: Name of the Security Group Analysis Dynamo DB table
+    Value: !Ref DynamoTableSGAnalysis
+  DynamoTableENIAnalysis:
+    Description: Name of the Security Group Elastic Network Interface Dynamo DB table
+    Value: !Ref DynamoTableENIAnalysis
+  DynamoTableSortSG:
+    Description: Name of the sorted IP Addresses/Security Groups Dynamo DB table
+    Value: !Ref DynamoTableSortSG
+  StepFunctionsStateMachine:
+    Description: Name of Step function
+    Value: !Ref StepFunctionsStateMachine
+  SgaGetSgLambda:
+    Description: Name of the Get Security Groups Lambda
+    Value: !Ref SgaGetSgLambda  
+  SgaGetEniLambda:
+    Description: Name of the Get Elastic Network Interfaces Lambda
+    Value: !Ref SgaGetEniLambda
+  SgaSortSGLambda:
+    Description: Name of the Get Elastic Network Interfaces Lambda
+    Value: !Ref SgaSortSGLambda
+
+
+
+
+  
 Resources:
 
     SgaCloudWatchLogsPolicy:
