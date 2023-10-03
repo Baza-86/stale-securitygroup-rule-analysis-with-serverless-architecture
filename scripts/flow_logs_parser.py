@@ -99,7 +99,7 @@ def rule_filter(resp_list):
     return (ref_rules,cidr_rules)
 
 @timer(timer_results=get_sg_ref_ips_results)
-@lru_cache(maxsize=32)
+@lru_cache(maxsize=1024)
 def get_sg_ref_ips(sg_id):
     deserialize = TypeDeserializer()
     response = dynamodb.get_item(
