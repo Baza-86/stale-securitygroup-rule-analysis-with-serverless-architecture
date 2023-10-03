@@ -362,3 +362,9 @@ Resources:
       FunctionName: !GetAtt SgaLambdaPartitionerDaily.Arn
       Principal: events.amazonaws.com
       SourceArn: !GetAtt SgaScheduledEventRule.Arn
+
+Outputs:
+  FlowLogBucket:
+    Value: !Ref VpcFlowLogsTable
+    Export:
+      Name: !Join ["-", ["sga", !Ref MemberAccountId, vpc-flow-logs-table]]
