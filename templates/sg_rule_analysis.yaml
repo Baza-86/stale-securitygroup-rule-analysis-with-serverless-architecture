@@ -494,7 +494,7 @@ Resources:
     EventsRule:
         Type: "AWS::Events::Rule"
         Properties:
-            ScheduleExpression: "cron(00 10 ? * MON-FRI *)"
+            ScheduleExpression: "cron(00 10 ? * TUE-SAT *)"
             State: "ENABLED"
             Targets: 
                 - 
