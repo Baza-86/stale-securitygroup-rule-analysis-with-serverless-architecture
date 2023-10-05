@@ -53,3 +53,9 @@ Resources:
                     - <VPCFlowLogsAccountID>
                 StringEquals: 
                   "s3:x-amz-acl": "bucket-owner-full-control"
+
+Outputs:
+  FlowLogBucket:
+    Value: !Ref SgaS3BucketVPCLogs
+    Export:
+      Name: sga-s3-bucket-vpc-logs-ref

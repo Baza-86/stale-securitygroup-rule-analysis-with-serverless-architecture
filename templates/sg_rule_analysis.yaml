@@ -4,6 +4,36 @@ Parameters:
   SgaVpcFlowLogBucket:
     Type: String
     Description: The arn of the VPC flow log bucket
+Outputs:
+  DynamoTableSGRules:
+    Description: Name of the Security Group Rules Dynamo DB table
+    Value: !Ref DynamoTableSGRules
+  DynamoTableSGAnalysis:
+    Description: Name of the Security Group Analysis Dynamo DB table
+    Value: !Ref DynamoTableSGAnalysis
+  DynamoTableENIAnalysis:
+    Description: Name of the Security Group Elastic Network Interface Dynamo DB table
+    Value: !Ref DynamoTableENIAnalysis
+  DynamoTableSortSG:
+    Description: Name of the sorted IP Addresses/Security Groups Dynamo DB table
+    Value: !Ref DynamoTableSortSG
+  StepFunctionsStateMachine:
+    Description: Name of Step function
+    Value: !Ref StepFunctionsStateMachine
+  SgaGetSgLambda:
+    Description: Name of the Get Security Groups Lambda
+    Value: !Ref SgaGetSgLambda  
+  SgaGetEniLambda:
+    Description: Name of the Get Elastic Network Interfaces Lambda
+    Value: !Ref SgaGetEniLambda
+  SgaSortSGLambda:
+    Description: Name of the Get Elastic Network Interfaces Lambda
+    Value: !Ref SgaSortSGLambda
+
+
+
+
+  
 Resources:
 
     SgaCloudWatchLogsPolicy:
@@ -171,25 +201,17 @@ Resources:
         Type: "AWS::DynamoDB::Table"
         Properties:
           BillingMode: PAY_PER_REQUEST
-          GlobalSecondaryIndexes:
-            - IndexName: protocol
-              KeySchema:
-              - AttributeName: sg_id
-                KeyType: HASH 
-              - AttributeName: protocol
-                KeyType: RANGE
-              Projection:
-                ProjectionType: ALL
           AttributeDefinitions:
             - AttributeName: sgr_flow_hash
               AttributeType: S
-            - AttributeName: sg_id
-              AttributeType: S
-            - AttributeName: protocol
+            - AttributeName: account_no
               AttributeType: S
           KeySchema:
             - AttributeName: sgr_flow_hash
               KeyType: HASH
+            - AttributeName: account_no
+              KeyType: RANGE
+          
       
     DynamoTableENIAnalysis:
         Type: "AWS::DynamoDB::Table"
@@ -437,7 +459,8 @@ Resources:
                                     "Arguments": {
                                       "--region.$": "$.data.region",
                                       "--outputCsv.$": "$.outputCsv",
-                                      "--path.$": "$.data.path"
+                                      "--path.$": "$.data.path",
+                                      "--accountNo.$": "$.data.AccountNo"
                                     }
                                   },
                                   "InputPath": "$",
@@ -471,8 +494,8 @@ Resources:
     EventsRule:
         Type: "AWS::Events::Rule"
         Properties:
-            ScheduleExpression: "cron(30 * * * ? *)"
-            State: "DISABLED"
+            ScheduleExpression: "cron(00 10 ? * TUE-SAT *)"
+            State: "ENABLED"
             Targets: 
                 - 
                   Arn:
@@ -578,7 +601,7 @@ Resources:
                 --prebuilt-library-option: "prebuilt-library-enable"
                 --region: !Ref "AWS::Region"
                 --database: !ImportValue sga-glue-database-ref
-                --table: "sg_analysis_rules_data_ks"
+                --table: "sg_analysis_rules_data"
                 --bucket: !ImportValue sga-athena-bucket-ref
                 --path: "path"
             MaxRetries: 1
@@ -758,7 +781,7 @@ Resources:
         Timeout: 300
         Code:
           S3Bucket: !ImportValue sga-resources-bucket-ref
-          S3Key: KS-Test-SgaGetSgLambda-FU23JMQzQK3h-b0d41471-bd70-4a45-9548-4fa7e8e2c158.zip
+          S3Key: SgaGetSgLambda-FU23JMQzQK3h-b0d41471-bd70-4a45-9548-4fa7e8e2c158.zip
 
     SgaGetEniLambdaIAMRole:
         Type: AWS::IAM::Role
@@ -817,7 +840,7 @@ Resources:
         Timeout: 300
         Code:
           S3Bucket: !ImportValue sga-resources-bucket-ref
-          S3Key: KS-Test-SgaGetEniLambda-zTqrdlSrwIes-dd6156a0-4ad4-441c-b0ea-4ad738306e4d.zip
+          S3Key: SgaGetEniLambda-zTqrdlSrwIes-dd6156a0-4ad4-441c-b0ea-4ad738306e4d.zip
 
     SgaSortSGLambdaIAMRole:
         Type: AWS::IAM::Role
