@@ -230,6 +230,7 @@ def insert_usage_data(sg_rule_id, sg_id, flow_dir, flow_count, addr, port, accou
                 TableName=dynamodb_tbl_name,
                 Key={
                   'sgr_flow_hash': {'S': str(hash_digest)},
+                  'account_no': {'S': accountNo}
                 },
                 UpdateExpression='SET used_times = used_times + :val, sg_rule_last_used = :newlastused',
                 ExpressionAttributeValues={
