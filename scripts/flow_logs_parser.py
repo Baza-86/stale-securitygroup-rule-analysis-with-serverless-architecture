@@ -124,13 +124,11 @@ def port_test(rule_port_from,rule_port_to,flow_port):
         return True
     else:
         return False
+
 @timer(timer_results=rule_matcher_results)
 def rule_matcher(resp_list,flow):
     [r.update({'match_score':1}) for r in resp_list]
-    if len(resp_list) == 1:
-        return resp_list
-    else:
-        ref_rules,cidr_rules = rule_filter(resp_list)
+    ref_rules,cidr_rules = rule_filter(resp_list)
     if len(ref_rules) > 0:
         for ref in ref_rules:
             ip_addresses = get_sg_ref_ips(ref['properties'].get('ReferencedGroupInfo')['GroupId'])
@@ -162,7 +160,6 @@ def get_sg_rule_id_dynamo_query(sg_id):
             }
         }
     )
-
     return response
 
 @timer(timer_results=security_group_rule_parser_results)
@@ -230,6 +227,7 @@ def insert_usage_data(sg_rule_id, sg_id, flow_dir, flow_count, addr, port, accou
                 TableName=dynamodb_tbl_name,
                 Key={
                   'sgr_flow_hash': {'S': str(hash_digest)},
+                  'account_no': {'S': accountNo}
                 },
                 UpdateExpression='SET used_times = used_times + :val, sg_rule_last_used = :newlastused',
                 ExpressionAttributeValues={
