@@ -1,0 +1,34 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Enable flow logs
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: 1234567890
+        Parameters:
+          - AccountNo
+    ParameterLabels:
+      AccountNo:
+        default: Support all resource types
+
+Parameters:
+  AccountNo:
+    Type: String
+    Description: the account number
+  VPCID:
+    Type: String
+    Description: vpc id
+  S3Bucket:
+    Type: String
+    Description: ARN for S3 Bucket to output flowlogs
+
+Resources:
+  EC2FlowLogs:
+    Type: AWS::EC2::FlowLog
+    Properties:
+      LogDestinationType: s3
+      LogDestination: !Ref S3Bucket
+      ResourceId: !Ref VPCID
+      ResourceType: VPC
+      LogFormat: ${account-id}
