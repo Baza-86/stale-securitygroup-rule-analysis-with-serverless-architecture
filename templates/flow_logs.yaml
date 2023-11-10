@@ -17,4 +17,5 @@ Resources:
       LogDestination: !Ref logBucketArn
       ResourceId: !Ref vpcId
       ResourceType: VPC
-      LogFormat: ${account-id} ${action} ${az_id} ${bytes} ${dstaddr} ${dstport} ${end} ${flow_direction} ${instance_id} ${interface_id} ${log_status} ${packets} ${pkt_dst_aws_service} ${pkt_dstaddr} ${pkt_src_aws_service} ${pkt_srcaddr} ${protocol} ${region} ${srcaddr} ${srcport} ${start} ${sublocation_id} ${sublocation_type} ${subnet_id} ${tcp_flags} ${traffic_path} ${type} ${version} ${vpc_id}
+      LogFormat: ${account-id} ${action} ${az-id} ${bytes} ${dstaddr} ${dstport} ${end} ${flow-direction} ${instance-id} ${interface-id} ${log-status} ${packets} ${pkt-dst-aws-service} ${pkt-dstaddr} ${pkt-src-aws-service} ${pkt-srcaddr} ${protocol} ${region} ${srcaddr} ${srcport} ${start} ${sublocation-id} ${sublocation-type} ${subnet-id} ${tcp-flags} ${traffic-path} ${type} ${version} ${vpc-id}
+      TrafficType: ALL
