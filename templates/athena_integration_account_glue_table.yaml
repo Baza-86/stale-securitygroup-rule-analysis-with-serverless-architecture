@@ -346,7 +346,6 @@ Resources:
     Type: AWS::Events::Rule
     Properties:
       Description: This event rule will be invoking lambda based on schedule
-      Name: SgaScheduledEventRule
       ScheduleExpression: cron(0 0 * * ? *)
       State: ENABLED
       Targets:
