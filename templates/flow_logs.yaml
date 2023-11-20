@@ -1,0 +1,21 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Enable flow logs
+
+Parameters:
+  vpcId:
+    Type: String
+    Description: vpc id
+  logBucketArn:
+    Type: String
+    Description: ARN for S3 Bucket to output flowlogs
+
+Resources:
+  EC2FlowLogs:
+    Type: AWS::EC2::FlowLog
+    Properties:
+      LogDestinationType: s3
+      LogDestination: !Ref logBucketArn
+      ResourceId: !Ref vpcId
+      ResourceType: VPC
+      LogFormat: ${account-id} ${action} ${az-id} ${bytes} ${dstaddr} ${dstport} ${end} ${flow-direction} ${instance-id} ${interface-id} ${log-status} ${packets} ${pkt-dst-aws-service} ${pkt-dstaddr} ${pkt-src-aws-service} ${pkt-srcaddr} ${protocol} ${region} ${srcaddr} ${srcport} ${start} ${sublocation-id} ${sublocation-type} ${subnet-id} ${tcp-flags} ${traffic-path} ${type} ${version} ${vpc-id}
+      TrafficType: ALL
