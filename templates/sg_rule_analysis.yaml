@@ -475,12 +475,18 @@ Resources:
                               "outputCsv.$": "$$.Map.Item.Value"
                             }
                           }
+                        },
+                        "ProcessorConfig": {
+                          "Mode": "DISTRIBUTED",
+                          "ExecutionType": "STANDARD"
                         }
                       },
-                      "End": true
+                      "End": true,
+                      "Label": "ProcessItems",
+                      "MaxConcurrency": 10
                     }
                   }
-                }
+                } 
               - AthenaBucket: !ImportValue sga-athena-bucket-ref
             RoleArn: !GetAtt SgaStepFunctionIAMRole.Arn
             StateMachineType: "STANDARD"
