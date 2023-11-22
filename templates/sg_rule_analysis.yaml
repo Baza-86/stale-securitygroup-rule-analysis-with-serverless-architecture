@@ -491,7 +491,8 @@ Resources:
                       },
                       "End": true,
                       "Label": "ProcessItems",
-                      "MaxConcurrency": 10
+                      "MaxConcurrency": 10,
+                      "ToleratedFailureCount": 9
                     }
                   }
                 } 
