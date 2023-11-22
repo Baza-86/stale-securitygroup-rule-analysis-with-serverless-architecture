@@ -137,6 +137,14 @@ Resources:
                           - ''
                           - - !Ref SgaVpcFlowLogBucket
                             - "/*"
+            - PolicyName: StepFunctionInvokeStepFunction
+              PolicyDocument: 
+                Version: '2012-10-17'
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - states:StartExecution
+                    Resource: "*"
 
 
     SgaEventBridgeIAMManagedPolicy:
@@ -475,12 +483,19 @@ Resources:
                               "outputCsv.$": "$$.Map.Item.Value"
                             }
                           }
+                        },
+                        "ProcessorConfig": {
+                          "Mode": "DISTRIBUTED",
+                          "ExecutionType": "STANDARD"
                         }
                       },
-                      "End": true
+                      "End": true,
+                      "Label": "ProcessItems",
+                      "MaxConcurrency": 10,
+                      "ToleratedFailureCount": 9
                     }
                   }
-                }
+                } 
               - AthenaBucket: !ImportValue sga-athena-bucket-ref
             RoleArn: !GetAtt SgaStepFunctionIAMRole.Arn
             StateMachineType: "STANDARD"
