@@ -209,10 +209,23 @@ Resources:
         Type: "AWS::DynamoDB::Table"
         Properties:
           BillingMode: PAY_PER_REQUEST
+          GlobalSecondaryIndexes:
+            - IndexName: rule_id_idx
+              KeySchema:
+              - AttributeName: rule_id
+                KeyType: HASH
+              - AttributeName: account_no
+                KeyType: RANGE
+              Projection:
+                ProjectionType: INCLUDE
+                NonKeyAttributes:
+                  - used_times
           AttributeDefinitions:
             - AttributeName: sgr_flow_hash
               AttributeType: S
             - AttributeName: account_no
+              AttributeType: S
+            - AttributeName: rule_id
               AttributeType: S
           KeySchema:
             - AttributeName: sgr_flow_hash
