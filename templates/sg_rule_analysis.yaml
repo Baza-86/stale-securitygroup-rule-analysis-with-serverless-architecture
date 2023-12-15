@@ -4,6 +4,10 @@ Parameters:
   SgaVpcFlowLogBucket:
     Type: String
     Description: The arn of the VPC flow log bucket
+  GlueJobConcurrency:
+    Type: Number
+    Description: The maximum concurrency value for the Glue job analysis step
+    Default: 10
 Outputs:
   DynamoTableSGRules:
     Description: Name of the Security Group Rules Dynamo DB table
@@ -718,7 +722,7 @@ Resources:
             Description: "Job to parse flow logs and calculate usage"
             Role: !GetAtt SgaParseFlowLogsGlueJobIAMRole.Arn
             ExecutionProperty: 
-                MaxConcurrentRuns: 10
+                MaxConcurrentRuns: !Ref GlueJobConcurrency
             Command: 
                 Name: "pythonshell"
                 ScriptLocation: !Join
