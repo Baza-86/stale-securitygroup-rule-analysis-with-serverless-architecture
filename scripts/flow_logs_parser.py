@@ -283,26 +283,33 @@ def main():
     
     #print(f'sg_rule_id_query cache stats')
     #print(get_sg_rule_id_dynamo_query.cache_info())
-    print(f'quantiles for sg_rule_id_query: {statistics.quantiles(sg_rule_id_query_results)}')
+    try:
+        print(f'quantiles for sg_rule_id_query: {statistics.quantiles(sg_rule_id_query_results)}')
     
-    #print(f'get_sg_ref_ips cache stats')
-    #print(get_sg_ref_ips.cache_info())
-    print(f'quantiles for get_sg_ref_ips: {statistics.quantiles(get_sg_ref_ips_results)}')
-    
-    print(f'quantiles for rule_matcher: {statistics.quantiles(rule_matcher_results)}')
-    
-    #print(f'security_group_rule_parser cache stats')
-    #print(security_group_rule_parser.cache_info())
-    print(f'quantiles for security_group_rule_parser: {statistics.quantiles(security_group_rule_parser_results)}')
-    
-    print(f'quantiles for get_sg_rule_id: {statistics.quantiles(get_sg_rule_id_results)}')
-    
-    print(f'quantiles for get_interface_ddb: {statistics.quantiles(get_interface_ddb_results)}')
-    
+        #print(f'get_sg_ref_ips cache stats')
+        #print(get_sg_ref_ips.cache_info())
+        print(f'quantiles for get_sg_ref_ips: {statistics.quantiles(get_sg_ref_ips_results)}')
+        
+        print(f'quantiles for rule_matcher: {statistics.quantiles(rule_matcher_results)}')
+        
+        #print(f'security_group_rule_parser cache stats')
+        #print(security_group_rule_parser.cache_info())
+        print(f'quantiles for security_group_rule_parser: {statistics.quantiles(security_group_rule_parser_results)}')
+        
+        print(f'quantiles for get_sg_rule_id: {statistics.quantiles(get_sg_rule_id_results)}')
+        
+        print(f'quantiles for get_interface_ddb: {statistics.quantiles(get_interface_ddb_results)}')
+        
 
-    print("Writing rules data to DynamoDB table- completed at: "+str(datetime.now()))
-    end = time.time()
-    print("Total time taken in minutes: "+str((end - start)/60))
+        print("Writing rules data to DynamoDB table- completed at: "+str(datetime.now()))
+    except statistics.StatisticsError as e:
+        print(e)
+        print('error printing runtime statistics, could indicate failure in analysis functions, check further up error log')
+    except Exception as e:
+        print(e)
+    finally:
+        end = time.time()
+        print("Total time taken in minutes: "+str((end - start)/60))
 
 
 if __name__ == "__main__":

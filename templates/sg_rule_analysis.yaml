@@ -4,6 +4,10 @@ Parameters:
   SgaVpcFlowLogBucket:
     Type: String
     Description: The arn of the VPC flow log bucket
+  GlueJobConcurrency:
+    Type: Number
+    Description: The maximum concurrency value for the Glue job analysis step
+    Default: 10
 Outputs:
   DynamoTableSGRules:
     Description: Name of the Security Group Rules Dynamo DB table
@@ -137,6 +141,14 @@ Resources:
                           - ''
                           - - !Ref SgaVpcFlowLogBucket
                             - "/*"
+            - PolicyName: StepFunctionInvokeStepFunction
+              PolicyDocument: 
+                Version: '2012-10-17'
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - states:StartExecution
+                    Resource: "*"
 
 
     SgaEventBridgeIAMManagedPolicy:
@@ -201,10 +213,23 @@ Resources:
         Type: "AWS::DynamoDB::Table"
         Properties:
           BillingMode: PAY_PER_REQUEST
+          GlobalSecondaryIndexes:
+            - IndexName: rule_id_idx
+              KeySchema:
+              - AttributeName: rule_id
+                KeyType: HASH
+              - AttributeName: account_no
+                KeyType: RANGE
+              Projection:
+                ProjectionType: INCLUDE
+                NonKeyAttributes:
+                  - used_times
           AttributeDefinitions:
             - AttributeName: sgr_flow_hash
               AttributeType: S
             - AttributeName: account_no
+              AttributeType: S
+            - AttributeName: rule_id
               AttributeType: S
           KeySchema:
             - AttributeName: sgr_flow_hash
@@ -475,12 +500,19 @@ Resources:
                               "outputCsv.$": "$$.Map.Item.Value"
                             }
                           }
+                        },
+                        "ProcessorConfig": {
+                          "Mode": "DISTRIBUTED",
+                          "ExecutionType": "STANDARD"
                         }
                       },
-                      "End": true
+                      "End": true,
+                      "Label": "ProcessItems",
+                      "MaxConcurrency": 10,
+                      "ToleratedFailureCount": 9
                     }
                   }
-                }
+                } 
               - AthenaBucket: !ImportValue sga-athena-bucket-ref
             RoleArn: !GetAtt SgaStepFunctionIAMRole.Arn
             StateMachineType: "STANDARD"
@@ -690,7 +722,7 @@ Resources:
             Description: "Job to parse flow logs and calculate usage"
             Role: !GetAtt SgaParseFlowLogsGlueJobIAMRole.Arn
             ExecutionProperty: 
-                MaxConcurrentRuns: 10
+                MaxConcurrentRuns: !Ref GlueJobConcurrency
             Command: 
                 Name: "pythonshell"
                 ScriptLocation: !Join
@@ -900,7 +932,7 @@ Resources:
         Timeout: 900
         Code:
           S3Bucket: !ImportValue sga-resources-bucket-ref
-          S3Key: SortSecurityGroupReferences-33408ae9-78dc-426b-b200-36363544cffc.zip
+          S3Key: SortSecurityGroupReferences-hQooYb3bJ2Hs-27025f9d-c6a4-4e7f-aa8a-405c3d3b6b9b.zip
 
     PayloadCreatorRole:
         Type: AWS::IAM::Role
