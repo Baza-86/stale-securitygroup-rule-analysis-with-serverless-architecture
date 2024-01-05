@@ -21,11 +21,13 @@ def lambda_handler(event, context):
             resources = []
             for r in mylist:
                 resources.append(r.resource_id)
+                myresource = awsconfig.get_resource_config_history(resource_type="AWS::EC2::NetworkInterface", resource_id=r.resource_id)
+                print(myresource[0].configuration)
 
             print(resources)
-            myresource = awsconfig.batch_get_resource_config(resource_type="AWS::EC2::NetworkInterface", resource_id=resources)
+            
             print(mylist)
-            print(myresource)
+            
         else:
             pass
         
