@@ -932,7 +932,7 @@ Resources:
         Timeout: 900
         Code:
           S3Bucket: !ImportValue sga-resources-bucket-ref
-          S3Key: SortSecurityGroupReferences-hQooYb3bJ2Hs-27025f9d-c6a4-4e7f-aa8a-405c3d3b6b9b.zip
+          S3Key: SortSecurityGroupReferences-hQooYb3bJ2Hs-ede521f8-c55a-4e61-9bee-151852f99a64.zip
 
     PayloadCreatorRole:
         Type: AWS::IAM::Role
