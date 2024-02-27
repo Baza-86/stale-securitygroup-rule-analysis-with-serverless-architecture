@@ -219,7 +219,8 @@ def insert_usage_data(sg_rule_id, sg_id, flow_dir, flow_count, addr, port, accou
                     'dstport': {'N':str(port)},
                     'used_times': {'N':str(flow_count)},
                     'sg_rule_last_used': {'S':date_yst.strftime('%Y-%m-%d')},
-                    'account_no': {'S': accountNo}
+                    'account_no': {'S': accountNo},
+                    'ttl': {'N':str(int((datetime.now() + timedelta(days=60)).timestamp()))}
                 }
             )
         else:
@@ -229,10 +230,11 @@ def insert_usage_data(sg_rule_id, sg_id, flow_dir, flow_count, addr, port, accou
                   'sgr_flow_hash': {'S': str(hash_digest)},
                   'account_no': {'S': accountNo}
                 },
-                UpdateExpression='SET used_times = used_times + :val, sg_rule_last_used = :newlastused',
+                UpdateExpression='SET used_times = used_times + :val, sg_rule_last_used = :newlastused, ttl = :newttl',
                 ExpressionAttributeValues={
                     ':val': {'N':str(flow_count)},
-                    ':newlastused': {'S':date_yst.strftime('%Y-%m-%d')}
+                    ':newlastused': {'S':date_yst.strftime('%Y-%m-%d')},
+                    ':newttl': {'N':str(int((datetime.now() + timedelta(days=60)).timestamp()))}
                 },
                 ReturnValues="UPDATED_NEW"
             )
