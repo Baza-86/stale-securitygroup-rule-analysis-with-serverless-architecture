@@ -11,8 +11,9 @@ def lambda_handler(event, context):
     #print(analysis_table.key_schema)
     # Set the TTL in number of DAYS
     ttl_days = int(os.environ.get('TTL_UPDATE'))
-    print(event['data'])
-    for e in event['data']:
+    print(event['Items'])
+    updated_records = []
+    for e in event['Items']:
         print(e)
         try:
             ttl_timestamp = int((datetime.now() + timedelta(days=ttl_days)).timestamp())
@@ -30,5 +31,7 @@ def lambda_handler(event, context):
                 ReturnValues="UPDATED_NEW"
             )
             print(f"{response}")
+            updated_records.append(e)
         except Exception as e:
             print(f"Error: {e}")
+    return updated_records
