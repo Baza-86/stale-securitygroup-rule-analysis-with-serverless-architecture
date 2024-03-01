@@ -131,7 +131,7 @@ Resources:
                       }
                     },
                     "ItemBatcher": {
-                      "MaxItemsPerBatch": 2
+                      "MaxItemsPerBatch": 100
                     },
                     "End": true
                   }
