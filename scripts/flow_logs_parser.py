@@ -200,6 +200,7 @@ def get_sg_rule_id(sg_id, flow_count, protocol, flow_dir, addr, dstport, account
 def insert_usage_data(sg_rule_id, sg_id, flow_dir, flow_count, addr, port, accountNo, protocol):
     addr_rule_hash = [sg_rule_id,addr,port,protocol]
     hash_digest = sha1(str(addr_rule_hash).encode()).hexdigest()
+    ttl_timestamp = int((datetime.now() + timedelta(days=60)).timestamp())
     try:
         checkRuleIdExists=dynamodb.query(
             TableName=dynamodb_tbl_name,
@@ -220,7 +221,7 @@ def insert_usage_data(sg_rule_id, sg_id, flow_dir, flow_count, addr, port, accou
                     'used_times': {'N':str(flow_count)},
                     'sg_rule_last_used': {'S':date_yst.strftime('%Y-%m-%d')},
                     'account_no': {'S': accountNo},
-                    'ttl': {'N':str(int((datetime.now() + timedelta(days=60)).timestamp()))}
+                    'ttl': {'N':str(ttl_timestamp)}
                 }
             )
         else:
@@ -230,11 +231,12 @@ def insert_usage_data(sg_rule_id, sg_id, flow_dir, flow_count, addr, port, accou
                   'sgr_flow_hash': {'S': str(hash_digest)},
                   'account_no': {'S': accountNo}
                 },
-                UpdateExpression='SET used_times = used_times + :val, sg_rule_last_used = :newlastused, ttl = :newttl',
+                UpdateExpression='SET used_times = used_times + :val, sg_rule_last_used = :newlastused, #ttl_attr = :newttl',
+                ExpressionAttributeNames={'#ttl_attr': 'ttl'},
                 ExpressionAttributeValues={
                     ':val': {'N':str(flow_count)},
                     ':newlastused': {'S':date_yst.strftime('%Y-%m-%d')},
-                    ':newttl': {'N':str(int((datetime.now() + timedelta(days=60)).timestamp()))}
+                    ':newttl': {'N':str(ttl_timestamp)}
                 },
                 ReturnValues="UPDATED_NEW"
             )
