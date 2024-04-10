@@ -60,6 +60,7 @@ Resources:
                     Action:
                       - s3:Get*
                       - s3:List*
+                      - s3:PutObject
                     Resource:
                       - !ImportValue sga-athena-bucket-arn
                       - !Join
@@ -133,7 +134,14 @@ Resources:
                     "ItemBatcher": {
                       "MaxItemsPerBatch": 100
                     },
-                    "End": true
+                    "End": true,
+                    "ResultWriter": {
+                      "Resource": "arn:aws:states:::s3:putObject",
+                      "Parameters": {
+                        "Bucket": "sga-s3-buckets-sgas3bucketathena-1wyyt3x9zqnus",
+                        "Prefix": "ddb_expiry/logs/"
+                      }
+                    }
                   }
                 }
               }
