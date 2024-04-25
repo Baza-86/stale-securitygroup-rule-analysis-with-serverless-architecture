@@ -212,6 +212,9 @@ Resources:
     DynamoTableSGAnalysis:
         Type: "AWS::DynamoDB::Table"
         Properties:
+          TimeToLiveSpecification:
+            AttributeName: ttl
+            Enabled: true
           BillingMode: PAY_PER_REQUEST
           GlobalSecondaryIndexes:
             - IndexName: rule_id_idx
