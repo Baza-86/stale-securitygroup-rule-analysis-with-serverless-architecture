@@ -3,9 +3,8 @@ Query to return ingress packet flow counts for a given interface that provides n
 You can repeat the WHEN THEN statements to add other named IP addresses and subnets.
 
 The query also adds the 'initiator' column to work out if the interface is likely acting as the client or server
-in the captured flow. This is simply done by comparing the srcport to dstport, and where the srcport is greater
-than the dstport. The flow is labelled as client, where dstport > srcport the flow is labelled as initiator.
-This isn’t exact, but works in most cases.
+in the captured flow. This is simply done by comparing the srcport to dstport. Where the srcport > dstport the flow
+is labelled as server. Where srcport < dstport the flow is labelled as client. This isn’t exact, but works in most cases.
 
 Replace the following values in the query:
 ------------------------------------------
@@ -33,14 +32,14 @@ SELECT
         ELSE 'other'
     END as protocol,
     flow_direction,
-    srcaddr,
     CASE
-		WHEN srcaddr = <IP_ADDR_1>
-		THEN <NAMED_SOURCE>
-    WHEN contains(<IP_SUBNET_1>, cast(srcaddr as IPADDRESS))
-    THEN 'NAMED_SUBNET'
-    ELSE 'other'
+	WHEN srcaddr = <IP_ADDR_1>
+	THEN <NAMED_SOURCE>
+    	WHEN contains(<IP_SUBNET_1>, cast(srcaddr as IPADDRESS))
+    	THEN 'NAMED_SUBNET'
+    	ELSE 'other'
     END as in_subnet,
+    srcaddr,
     srcport,
     dstaddr,
     dstport,
