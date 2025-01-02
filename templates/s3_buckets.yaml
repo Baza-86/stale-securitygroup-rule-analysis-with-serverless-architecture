@@ -8,7 +8,15 @@ Resources:
 
     SgaS3BucketAthena:
       Type: "AWS::S3::Bucket"
-      # DeletionPolicy: Retain
+      Properties:
+        LifecycleConfiguration:
+          Rules:
+            - Id: IaOneZone
+              Status: Enabled
+              ExpirationInDays: 365
+              Transitions:
+                - StorageClass: ONEZONE_IA
+                  TransitionInDays: 90
     
     SgaS3BucketAthenaBucketPolicy:
       Type: AWS::S3::BucketPolicy

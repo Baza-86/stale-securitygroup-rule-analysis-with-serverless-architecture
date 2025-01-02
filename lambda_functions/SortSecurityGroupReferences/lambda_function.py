@@ -28,14 +28,14 @@ def lambda_handler(event, context):
     sg_client.list_security_group_rules()
     security_groups_with_sgrs_mapped = []
 
-    security_group_rules_with_reference = [sgr for sgr in sg_client.security_group_rules if 'ReferencedGroupInfo' in sgr.properties]
+    unique_groups_with_ref = list(set([sgr.properties['ReferencedGroupInfo']['GroupId'] for sgr in sg_client.security_group_rules if 'ReferencedGroupInfo' in sgr.properties]))
 
-    for sgr in security_group_rules_with_reference:
+    for sg_id in unique_groups_with_ref:
         sg_dict = {
-            'id':sgr.properties['ReferencedGroupInfo']['GroupId'],
+            'id':sg_id,
             'ip_addresses':[]
         }
-        nic.get_interfaces_by_sg_id(sg_id=[sgr.properties['ReferencedGroupInfo']['GroupId']])
+        nic.get_interfaces_by_sg_id(sg_id=[sg_id])
         for ni in nic.iface_ids:
             try:
                 sg_dict['ip_addresses'].append(nic.get_interface(nic_id=[ni]).private_ip_address)
@@ -56,7 +56,3 @@ def lambda_handler(event, context):
         return {
             "message": e.response
         }
-    
-    
-    
-    
