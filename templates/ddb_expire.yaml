@@ -1,0 +1,198 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Template to create the DDB expiry lambda function"
+Parameters:
+  SgaAnalysisTable:
+    Type: String
+    Description: The name of the analysis table
+  SgaCloudWatchLogsPolicy:
+    Type: String
+    Description: The ARN for CloudWatchLogs managed policy
+  SgaDdbFunctionKey:
+    Type: String
+    Description: The zip file containing the ddb_expire lambda code
+
+Resources:
+
+    SgaStepFunctionDdbExpireIAMRole:
+        Type: AWS::IAM::Role
+        Properties:
+          AssumeRolePolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Principal:
+                  Service:
+                  - states.amazonaws.com
+                Action: sts:AssumeRole
+          Path: /
+          ManagedPolicyArns:
+            - !Ref SgaCloudWatchLogsPolicy
+          Policies:
+            - PolicyName: SgaSfLambdaInvokePolicy
+              PolicyDocument:
+                Version: '2012-10-17'
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - lambda:InvokeFunction
+                    Resource:
+                      - !GetAtt SgaDdbExpireLambda.Arn
+            - PolicyName: SgaSfCwlStepFunctions
+              PolicyDocument:
+                Version: '2012-10-17'
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - logs:CreateLogDelivery
+                      - logs:GetLogDelivery
+                      - logs:UpdateLogDelivery
+                      - logs:DeleteLogDelivery
+                      - logs:ListLogDeliveries
+                      - logs:PutResourcePolicy
+                      - logs:DescribeResourcePolicies
+                      - logs:DescribeLogGroups
+                    Resource: "*"
+            - PolicyName: StepFunctionS3Access
+              PolicyDocument:
+                Version: '2012-10-17'
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - s3:Get*
+                      - s3:List*
+                      - s3:PutObject
+                    Resource:
+                      - !ImportValue sga-athena-bucket-arn
+                      - !Join
+                          - ''
+                          - - !ImportValue sga-athena-bucket-arn
+                            - "/*"
+            - PolicyName: StepFunctionInvokeStepFunction
+              PolicyDocument: 
+                Version: '2012-10-17'
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - states:StartExecution
+                    Resource: "*"
+
+    SgaDdbExpireStepFunction:
+      Type: AWS::StepFunctions::StateMachine
+      Properties:
+        DefinitionString: !Sub |
+            {
+                "Comment": "A description of my state machine",
+                "StartAt": "Map",
+                "States": {
+                  "Map": {
+                    "Type": "Map",
+                    "ItemProcessor": {
+                      "ProcessorConfig": {
+                        "Mode": "DISTRIBUTED",
+                        "ExecutionType": "EXPRESS"
+                      },
+                      "StartAt": "Lambda Invoke",
+                      "States": {
+                        "Lambda Invoke": {
+                          "Type": "Task",
+                          "Resource": "arn:aws:states:::lambda:invoke",
+                          "OutputPath": "$.Payload",
+                          "Parameters": {
+                            "Payload.$": "$",
+                            "FunctionName": "${SgaDdbExpireLambda.Arn}"
+                          },
+                          "Retry": [
+                            {
+                              "ErrorEquals": [
+                                "Lambda.ServiceException",
+                                "Lambda.AWSLambdaException",
+                                "Lambda.SdkClientException",
+                                "Lambda.TooManyRequestsException"
+                              ],
+                              "IntervalSeconds": 1,
+                              "MaxAttempts": 3,
+                              "BackoffRate": 2
+                            }
+                          ],
+                          "End": true
+                        }
+                      }
+                    },
+                    "Label": "Map",
+                    "MaxConcurrency": 10,
+                    "ItemReader": {
+                      "Resource": "arn:aws:states:::s3:getObject",
+                      "ReaderConfig": {
+                        "InputType": "CSV",
+                        "CSVHeaderLocation": "FIRST_ROW"
+                      },
+                      "Parameters": {
+                        "Bucket.$": "$.bucketName",
+                        "Key.$": "$.bucketKey"
+                      }
+                    },
+                    "ItemBatcher": {
+                      "MaxItemsPerBatch": 100
+                    },
+                    "End": true,
+                    "ResultWriter": {
+                      "Resource": "arn:aws:states:::s3:putObject",
+                      "Parameters": {
+                        "Bucket": "sga-s3-buckets-sgas3bucketathena-1wyyt3x9zqnus",
+                        "Prefix": "ddb_expiry/logs/"
+                      }
+                    }
+                  }
+                }
+              }
+        RoleArn: !GetAtt SgaStepFunctionDdbExpireIAMRole.Arn
+        StateMachineType: "STANDARD"
+        LoggingConfiguration:
+            Destinations: 
+              - CloudWatchLogsLogGroup: 
+                    LogGroupArn: !GetAtt SgaStepFunctionDdbExpireLogGroup.Arn
+            IncludeExecutionData: true
+            Level: "ALL"
+
+    SgaStepFunctionDdbExpireLogGroup:
+        Type: "AWS::Logs::LogGroup"
+
+    SgaDdbExpireLambdaRole:
+        Type: AWS::IAM::Role
+        Properties:
+          AssumeRolePolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Principal:
+                  Service: lambda.amazonaws.com
+                Action: sts:AssumeRole
+          Path: /
+          ManagedPolicyArns:
+            - !Ref SgaCloudWatchLogsPolicy
+          Policies:
+            - PolicyName: DynamoDBPermissions
+              PolicyDocument:
+                Version: '2012-10-17'
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - dynamodb:UpdateItem
+                    Resource: 
+                      - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${SgaAnalysisTable}
+
+    SgaDdbExpireLambda:
+      Type: "AWS::Lambda::Function"
+      Properties:
+        Role: !GetAtt SgaDdbExpireLambdaRole.Arn
+        Handler: lambda_function.lambda_handler
+        Environment:
+          Variables:
+            DB_TABLE: !Ref SgaAnalysisTable
+            TTL_UPDATE: 30
+        Runtime: python3.11
+        MemorySize: 256
+        Timeout: 900
+        Code:
+          S3Bucket: !ImportValue sga-resources-bucket-ref
+          S3Key: !Ref SgaDdbFunctionKey

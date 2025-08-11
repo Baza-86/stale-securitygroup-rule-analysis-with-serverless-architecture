@@ -6,7 +6,14 @@ Resources:
       Type: "AWS::S3::Bucket"
       Properties: 
         AccessControl: BucketOwnerFullControl
-
+        LifecycleConfiguration:
+          Rules:
+            - Id: IaOneZone
+              Status: Enabled
+              ExpirationInDays: 365
+              Transitions:
+                - StorageClass: ONEZONE_IA
+                  TransitionInDays: 90
 
     s3BucketPolicy:
       Type: AWS::S3::BucketPolicy
